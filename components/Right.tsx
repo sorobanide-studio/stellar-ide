@@ -10,7 +10,10 @@ import { useFileManager } from "../hooks/useFileManager";
 import { useMonacoSetup } from "../hooks/useMonacoSetup";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useContainerManagement } from "../hooks/useContainerManagement";
-import { useTerminalLogging } from "../hooks/useTerminalLogging";
+import {
+  useTerminalLogging,
+  appendTerminalLogs,
+} from "../hooks/useTerminalLogging";
 import { useSidebarResize } from "../hooks/useSidebarResize";
 import { useTabManagement } from "../hooks/useTabManagement";
 import { useEditorState } from "../hooks/useEditorState";
@@ -56,7 +59,7 @@ export default function Right({
 
   const { logToTerminal } = useTerminalLogging({
     onLogsUpdate: (newLogs) => {
-      setLogs((prev) => [...prev, ...newLogs]);
+      setLogs((prev) => appendTerminalLogs(prev, newLogs));
     },
   });
 
