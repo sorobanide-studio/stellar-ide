@@ -20,6 +20,7 @@ interface UseLSPClientReturn {
   diagnosticsCount: number;
   openTextDocument: (text: string, uri?: string) => void;
   changeTextDocument: (text: string, uri?: string) => void;
+  closeTextDocument: (uri?: string) => void;
   requestInlayHints: (uri: string, range: { startLine: number; endLine: number }) => Promise<InlayHint[]>;
   requestHover: (uri: string, position: { line: number; character: number }) => Promise<{ contents: string } | null>;
   requestCompletion: (uri: string, position: { line: number; character: number }) => Promise<unknown[]>;
@@ -73,7 +74,7 @@ export function useLSPClient(
   });
 
   // Document synchronization
-  const { openTextDocument, changeTextDocument } = useLSPDocumentSync({
+  const { openTextDocument, changeTextDocument, closeTextDocument } = useLSPDocumentSync({
     wsRef,
     isInitialized,
     currentFileUri: fileUri,
@@ -105,6 +106,7 @@ export function useLSPClient(
     diagnosticsCount,
     openTextDocument,
     changeTextDocument,
+    closeTextDocument,
     requestInlayHints,
     requestHover,
     requestCompletion,

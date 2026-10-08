@@ -14,6 +14,7 @@ interface UseLSPSyncParams {
   fileContents: Map<string, string>;
   openTextDocument: (text: string, uri?: string) => void;
   changeTextDocument: (text: string, uri?: string) => void;
+  closeTextDocument: (uri?: string) => void;
 }
 
 /**
@@ -27,8 +28,41 @@ export function useLSPSync({
   fileContents,
   openTextDocument,
   changeTextDocument,
+  closeTextDocument,
 }: UseLSPSyncParams): void {
   const lastContentRef = useRef<string>("");
+  const openedUriRef = useRef<string>("");
+
+  // Close the previously open document (and the last one on unmount) so the
+  // language server does not accumulate open documents whose diagnostics then
+  // leak onto other files. Declared before the "open" effect so the didClose
+  // is emitted before the new didOpen.
+  useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
+
+    const currentUri =
+      openFile && openFile.name.endsWith(".rs") && fileUri ? fileUri : "";
+
+    if (openedUriRef.current && openedUriRef.current !== currentUri) {
+      closeTextDocument(openedUriRef.current);
+      openedUriRef.current = "";
+    }
+
+    if (currentUri) {
+      openedUriRef.current = currentUri;
+    }
+  }, [isConnected, openFile, fileUri, closeTextDocument]);
+
+  useEffect(() => {
+    return () => {
+      if (openedUriRef.current) {
+        closeTextDocument(openedUriRef.current);
+        openedUriRef.current = "";
+      }
+    };
+  }, [closeTextDocument]);
 
   // Open file in LSP when connected (only for Rust files)
   useEffect(() => {

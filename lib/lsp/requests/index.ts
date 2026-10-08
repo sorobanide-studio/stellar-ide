@@ -11,6 +11,7 @@ export type { TextEdit } from './utils';
 export {
   sendDidOpen,
   sendDidChange,
+  sendDidClose,
   sendInitialized,
 } from './notifications';
 

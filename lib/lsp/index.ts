@@ -35,6 +35,7 @@ export {
   createRequestId,
   sendDidOpen,
   sendDidChange,
+  sendDidClose,
   sendInitialized,
   requestInlayHints,
   requestHover,

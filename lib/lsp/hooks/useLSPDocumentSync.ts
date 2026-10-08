@@ -4,7 +4,8 @@
  */
 
 import { useCallback, useRef } from 'react';
-import { sendDidOpen, sendDidChange } from '../requests';
+import { sendDidOpen, sendDidChange, sendDidClose } from '../requests';
+import { markUriOpen, markUriClosed } from '../diagnostics';
 
 interface UseLSPDocumentSyncProps {
   wsRef: React.RefObject<WebSocket | null>;
@@ -15,6 +16,7 @@ interface UseLSPDocumentSyncProps {
 interface UseLSPDocumentSyncReturn {
   openTextDocument: (text: string, uri?: string) => void;
   changeTextDocument: (text: string, uri?: string) => void;
+  closeTextDocument: (uri?: string) => void;
 }
 
 /**
@@ -57,6 +59,7 @@ export function useLSPDocumentSync({
 
     sendDidOpen(ws, effectiveUri, text, versionRef.current);
     openedFilesRef.current.add(effectiveUri);
+    markUriOpen(effectiveUri);
   }, [wsRef, isInitialized]);
 
   // Change text document
@@ -82,8 +85,29 @@ export function useLSPDocumentSync({
     sendDidChange(ws, effectiveUri, text, versionRef.current);
   }, [wsRef, isInitialized]);
 
+  // Close text document
+  const closeTextDocument = useCallback((uri?: string) => {
+    const ws = wsRef.current;
+    const effectiveUri = uri || currentFileUriRef.current;
+
+    if (!openedFilesRef.current.has(effectiveUri)) {
+      return;
+    }
+
+    // Tell the server the document is closed (best effort: if the socket is
+    // already gone the server will drop its own state anyway).
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log(`[LSP DocumentSync] 📤 Closing document: ${effectiveUri}`);
+      sendDidClose(ws, effectiveUri);
+    }
+
+    openedFilesRef.current.delete(effectiveUri);
+    markUriClosed(effectiveUri);
+  }, [wsRef]);
+
   return {
     openTextDocument,
     changeTextDocument,
+    closeTextDocument,
   };
 }
