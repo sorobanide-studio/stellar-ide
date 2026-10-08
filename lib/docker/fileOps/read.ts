@@ -9,6 +9,12 @@ import {
   getWorkspacePath,
   escapeFilePath,
 } from '../utils';
+import {
+  buildFindFilesCommand,
+  buildReadFileCommand,
+  buildTestDirCommand,
+  buildTestFileCommand,
+} from './commands';
 
 /**
  * Get all files from container project directory
@@ -31,7 +37,7 @@ export async function getContainerFiles(walletAddress: string, projectName?: str
     }
 
     const workspacePath = getWorkspacePath();
-    
+
     // If no projectName, we need one
     if (!projectName) {
       return {
@@ -44,9 +50,9 @@ export async function getContainerFiles(walletAddress: string, projectName?: str
     const searchPath = `${workspacePath}/${projectName}`;
     console.log(`Searching for files in: ${searchPath}`);
 
-    // Check if project exists
+    // Check if project exists (as the unprivileged `developer` user)
     const { stdout: projectExists } = await execAsync(
-      `docker exec ${containerName} test -d ${searchPath} && echo "exists" || echo "missing"`
+      buildTestDirCommand(containerName, searchPath)
     );
 
     if (projectExists.trim() !== 'exists') {
@@ -59,7 +65,7 @@ export async function getContainerFiles(walletAddress: string, projectName?: str
 
     // Get files from container - find all files recursively
     const { stdout } = await execAsync(
-      `docker exec ${containerName} find ${searchPath} -type f 2>/dev/null`,
+      buildFindFilesCommand(containerName, searchPath),
       { timeout: 10000 }
     );
 
@@ -108,9 +114,9 @@ export async function getFileContent(walletAddress: string, filePath: string, pr
     const fullPath = `${basePath}/${safePath}`;
     console.log(`Full path for reading: ${fullPath}`);
 
-    // Verify file exists first
+    // Verify file exists first (as `developer`)
     const { stdout: fileExists } = await execAsync(
-      `docker exec ${containerName} test -f ${fullPath} && echo "exists" || echo "missing"`
+      buildTestFileCommand(containerName, fullPath)
     );
 
     if (fileExists.trim() !== 'exists') {
@@ -120,7 +126,7 @@ export async function getFileContent(walletAddress: string, filePath: string, pr
 
     // Read file from container
     const { stdout } = await execAsync(
-      `docker exec ${containerName} cat ${fullPath}`,
+      buildReadFileCommand(containerName, fullPath),
       { maxBuffer: 10 * 1024 * 1024 } // 10MB max file size
     );
 

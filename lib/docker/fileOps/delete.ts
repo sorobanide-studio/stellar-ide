@@ -9,6 +9,12 @@ import {
   getWorkspacePath,
   escapeFilePath,
 } from '../utils';
+import {
+  buildRemoveFileCommand,
+  buildRemoveFolderCommand,
+  buildTestDirCommand,
+  buildTestFileCommand,
+} from './commands';
 
 /**
  * Delete a file from the container
@@ -31,17 +37,17 @@ export async function deleteFile(walletAddress: string, filePath: string, projec
     const basePath = `${workspacePath}/${projectName}`;
     const fullPath = `${basePath}/${safePath}`;
 
-    // Verify file exists
+    // Verify file exists (as `developer`)
     const { stdout: fileCheck } = await execAsync(
-      `docker exec ${containerName} test -f ${fullPath} && echo "exists" || echo "missing"`
+      buildTestFileCommand(containerName, fullPath)
     );
 
     if (fileCheck.trim() !== 'exists') {
       throw new Error(`File does not exist: ${fullPath}`);
     }
 
-    // Delete file
-    await execAsync(`docker exec -u developer ${containerName} rm ${fullPath}`);
+    // Delete file (as `developer`)
+    await execAsync(buildRemoveFileCommand(containerName, fullPath));
 
     console.log(`File deleted: ${fullPath}`);
     return {
@@ -79,17 +85,17 @@ export async function deleteFolder(walletAddress: string, folderPath: string, pr
     const basePath = `${workspacePath}/${projectName}`;
     const fullPath = `${basePath}/${safePath}`;
 
-    // Verify folder exists
+    // Verify folder exists (as `developer`)
     const { stdout: folderCheck } = await execAsync(
-      `docker exec ${containerName} test -d ${fullPath} && echo "exists" || echo "missing"`
+      buildTestDirCommand(containerName, fullPath)
     );
 
     if (folderCheck.trim() !== 'exists') {
       throw new Error(`Folder does not exist: ${fullPath}`);
     }
 
-    // Delete folder recursively
-    await execAsync(`docker exec -u developer ${containerName} rm -rf ${fullPath}`);
+    // Delete folder recursively (as `developer`)
+    await execAsync(buildRemoveFolderCommand(containerName, fullPath));
 
     console.log(`Folder deleted: ${fullPath}`);
     return {

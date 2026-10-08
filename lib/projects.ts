@@ -22,7 +22,7 @@ export async function getAllProjects(walletAddress: string): Promise<Project[]> 
     const projectPath = getWorkspacePath();
     
     // List all directories in workspace
-    const cmd = `docker exec ${containerName} find ${projectPath} -maxdepth 1 -type d ! -name workspace -exec basename {} \\;`;
+    const cmd = `docker exec -u developer ${containerName} find ${projectPath} -maxdepth 1 -type d ! -name workspace -exec basename {} \\;`;
     const { stdout } = await execAsync(cmd);
     
     const folders = stdout
