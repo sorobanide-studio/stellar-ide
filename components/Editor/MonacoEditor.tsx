@@ -74,11 +74,17 @@ export default function MonacoEditorWrapper({
       editorRef.current = editorInstance;
       editorInstance.focus();
 
-      // Store Monaco instance globally for LSP client
+      // Store Monaco instance globally for LSP client.
+      // Temporary allowlist: this global is frozen until the LSP state moves
+      // into React context (the window-globals follow-up).
+      // eslint-disable-next-line no-restricted-syntax -- LSP state still lives on window; follow-up moves it to React context.
       window.monacoInstance = monaco;
       console.log("[MonacoEditor] Monaco instance stored globally");
 
-      // Store LSP functions for providers
+      // Store LSP functions for providers.
+      // Temporary allowlist: this global is frozen until the LSP state moves
+      // into React context (the window-globals follow-up).
+      // eslint-disable-next-line no-restricted-syntax -- LSP state still lives on window; follow-up moves it to React context.
       window.lspFunctions = {
         requestInlayHints,
         requestCompletion,
