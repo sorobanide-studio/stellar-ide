@@ -14,6 +14,31 @@ const SOROBAN_URL = "https://soroban-testnet.stellar.org";
 // Initialize server using the RPC module
 const server = new StellarRpc.Server(SOROBAN_URL);
 
+const SALT_LENGTH = 32;
+
+/**
+ * Decode a base64 string into a `Uint8Array`. Used instead of Node-only byte
+ * helpers so the deploy flow works in the browser, where this module runs.
+ * `atob` is available in every browser and in the Next.js client runtime.
+ */
+export function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/** Lower-case hex encoding of a byte array, browser-safe. */
+export function bytesToHex(bytes: Uint8Array): string {
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
 /**
  * Generate a 32-byte cryptographically-random salt for contract deployment.
  *
@@ -23,16 +48,15 @@ const server = new StellarRpc.Server(SOROBAN_URL);
  * predictable within a single browser session and therefore
  * attacker-influenceable.
  *
- * Returns a `Buffer` only because the Soroban SDK expects one at the
- * `createCustomContract` boundary; the source of randomness is the typed
- * array from `getRandomValues`, not a Buffer-based PRNG.
+ * Returns a plain `Uint8Array`: this module is client-only, so it must avoid
+ * Node-only byte types. The Soroban SDK accepts any byte sequence here.
  *
  * Exported for testability.
  */
-export function generateDeploymentSalt(): Buffer {
-  const bytes = new Uint8Array(32);
+export function generateDeploymentSalt(): Uint8Array {
+  const bytes = new Uint8Array(SALT_LENGTH);
   crypto.getRandomValues(bytes);
-  return Buffer.from(bytes);
+  return bytes;
 }
 
 export async function deployWithWallet(
@@ -102,7 +126,7 @@ export async function deployWithWallet(
     logToTerminal("", "log");
 
     // 3. Upload WASM
-    const wasmBuffer = Buffer.from(buildData.wasmBase64, "base64");
+    const wasmBytes = base64ToBytes(buildData.wasmBase64);
     const account = await server.getAccount(address);
 
     const uploadTx = new StellarSdk.TransactionBuilder(account, {
@@ -110,7 +134,9 @@ export async function deployWithWallet(
       networkPassphrase: NETWORK_PASSPHRASE,
     })
       .addOperation(
-        StellarSdk.Operation.uploadContractWasm({ wasm: wasmBuffer })
+        // The SDK accepts a raw byte sequence here; Uint8Array keeps this
+        // module free of Node-only byte types.
+        StellarSdk.Operation.uploadContractWasm({ wasm: wasmBytes as any })
       )
       .setTimeout(30)
       .build();
@@ -170,11 +196,11 @@ export async function deployWithWallet(
       throw new Error("Could not extract WASM hash from transaction");
     }
 
-    // Convert ScVal to Buffer - the returnValue is a ScVal object
+    // Convert the ScVal return value to raw bytes
     const wasmHashBytes = wasmHash.bytes ? wasmHash.bytes() : (wasmHash as any);
 
     logToTerminal(
-      ` WASM uploaded (hash: ${Buffer.from(wasmHashBytes as any).toString('hex').slice(0, 16)}...)`,
+      ` WASM uploaded (hash: ${bytesToHex(wasmHashBytes).slice(0, 16)}...)`,
       "log"
     );
     logToTerminal("", "log");
@@ -186,7 +212,7 @@ export async function deployWithWallet(
     // Both Date.now() and Math.random() are predictable within a single
     // browser session — using crypto.getRandomValues guarantees an
     // attacker-uninfluenceable contract address.
-    const saltBuffer = generateDeploymentSalt();
+    const saltBytes = generateDeploymentSalt();
     
     const createTx = new StellarSdk.TransactionBuilder(freshAccount, {
       fee: StellarSdk.BASE_FEE,
@@ -196,7 +222,7 @@ export async function deployWithWallet(
         StellarSdk.Operation.createCustomContract({
           wasmHash: wasmHashBytes,
           address: new StellarSdk.Address(address),
-          salt: saltBuffer,
+          salt: saltBytes as any,
         })
       )
       .setTimeout(30)
