@@ -12,7 +12,8 @@ deleteFolder,
 createAccount,
 deployContract,
 buildContract,
-checkContainerHealth
+checkContainerHealth,
+isValidStellarAddress
 } from '@/lib/docker';
 import {
 getAllProjects,
@@ -27,9 +28,18 @@ try {
 const { action, walletAddress, filePath, content, publicKey, projectName, description, oldName, newName } = await request.json();
 
 // Validate wallet address is provided
-if (!walletAddress && action !== 'checkHealth') {
+if (!walletAddress) {
   return NextResponse.json(
     { error: 'Wallet address is required' },
+    { status: 400 }
+  );
+}
+
+// Reject anything that is not a well-formed Stellar public key before it is
+// used to build a container name or any docker command.
+if (!isValidStellarAddress(walletAddress)) {
+  return NextResponse.json(
+    { error: 'Invalid wallet address' },
     { status: 400 }
   );
 }
