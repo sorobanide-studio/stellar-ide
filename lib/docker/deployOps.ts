@@ -25,11 +25,11 @@ export async function deployContract(userId: string, publicKey?: string, project
 
     console.log(`Deploying contract in container: ${containerName}, project: ${projectName || 'default'}`);
 
-    // Build the deployment command with optional publicKey parameter
-    // Note: --source-account is always required (the account that pays for deployment)
-    // --sign-with-key is optional (the key used to sign the transaction)
+    // Build the deployment command.
+    // --source-account comes from the caller when a publicKey is supplied and
+    // falls back to the container's local `darshan` identity otherwise.
     const deployCmd = publicKey
-      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`
+      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${publicKey} --network testnet --alias hello_world`
       : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`;
 
     const { stdout, stderr } = await execAsync(
@@ -119,8 +119,10 @@ export async function buildAndDeploy(userId: string, publicKey?: string, project
 
     console.log(`Building and deploying contract in container: ${containerName}, project: ${projectName || 'default'}`);
 
+    // --source-account comes from the caller when a publicKey is supplied and
+    // falls back to the container's local `darshan` identity otherwise.
     const deployCmd = publicKey
-      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`
+      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${publicKey} --network testnet --alias hello_world`
       : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`;
 
     const { stdout, stderr } = await execAsync(
@@ -150,4 +152,3 @@ export async function buildAndDeploy(userId: string, publicKey?: string, project
     };
   }
 }
-
