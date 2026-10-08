@@ -8,8 +8,25 @@ import {
   execAsync,
   getContainerName,
   getWorkspacePath,
+  getWorkspaceVolumeName,
   sleep,
 } from './utils';
+
+/**
+ * Build the `docker run` command that creates a wallet's container.
+ *
+ * Project files live in a per-wallet named volume mounted at the workspace
+ * path, so they (and the Stellar home under it) survive container removal and
+ * image rebuilds instead of living in the container's writable layer.
+ * Exported so the generated command can be asserted in tests.
+ * @param walletAddress The Stellar wallet public key
+ * @returns The full `docker run` command
+ */
+export function buildRunContainerCommand(walletAddress: string): string {
+  const containerName = getContainerName(walletAddress);
+  const volumeName = getWorkspaceVolumeName(walletAddress);
+  return `docker run -d --name ${containerName} -e STELLAR_HOME=/home/developer/workspace/.stellar -v ${volumeName}:/home/developer/workspace stellar-sandbox:v1 tail -f /dev/null`;
+}
 
 /**
  * Create and initialize a new Docker container
@@ -71,7 +88,7 @@ export async function createAndInitializeContainer(walletAddress: string) {
     if (!containerExists) {
       console.log(`Creating new container: ${containerName}`);
       const { stdout: createOutput } = await execAsync(
-        `docker run -d --name ${containerName} -e STELLAR_HOME=/home/developer/workspace/.stellar stellar-sandbox:v1 tail -f /dev/null`
+        buildRunContainerCommand(walletAddress)
       );
       console.log('Container created:', createOutput.trim());
 
@@ -134,12 +151,22 @@ export async function createAndInitializeContainer(walletAddress: string) {
 
 /**
  * Delete a Docker container
+ *
+ * The wallet's workspace volume is RETAINED by default: project files and the
+ * wallet identity live in the volume, not the container, so removing the
+ * container (or rebuilding the image) does not erase them. Pass
+ * `{ removeVolume: true }` to permanently delete the workspace as well.
  * @param walletAddress The Stellar wallet public key
+ * @param options.removeVolume Delete the workspace volume too (default false)
  * @returns Deletion result
  */
-export async function deleteContainer(walletAddress: string) {
+export async function deleteContainer(
+  walletAddress: string,
+  options: { removeVolume?: boolean } = {}
+) {
   try {
     const containerName = getContainerName(walletAddress);
+    const volumeName = getWorkspaceVolumeName(walletAddress);
     console.log(`Deleting container: ${containerName}`);
 
     // Stop container (ignore errors if not running)
@@ -149,18 +176,37 @@ export async function deleteContainer(walletAddress: string) {
       console.log('Container may not be running, continuing with removal');
     }
 
-    // Remove container (ignore errors if doesn't exist)
+    // Remove container (ignore errors if doesn't exist). The named volume is
+    // not attached to the container's lifecycle, so this leaves it intact.
     try {
       await execAsync(`docker rm -f ${containerName}`);
     } catch (error) {
       console.log('Container may not exist, considering deletion successful');
     }
 
-    console.log(`Container ${containerName} deleted`);
+    let volumeRemoved = false;
+    if (options.removeVolume) {
+      try {
+        await execAsync(`docker volume rm ${volumeName}`);
+        volumeRemoved = true;
+      } catch (error: any) {
+        console.warn(`Could not remove workspace volume ${volumeName}:`, error?.message || error);
+      }
+    }
+
+    console.log(
+      `Container ${containerName} deleted (workspace volume ${volumeName} ${
+        volumeRemoved ? 'removed' : 'retained'
+      })`
+    );
     return {
       success: true,
       containerName,
-      message: `Container ${containerName} deleted`,
+      volumeName,
+      volumeRetained: !volumeRemoved,
+      message: volumeRemoved
+        ? `Container ${containerName} and workspace volume ${volumeName} deleted`
+        : `Container ${containerName} deleted; workspace volume ${volumeName} retained`,
     };
   } catch (error: any) {
     console.error('Docker error:', error);

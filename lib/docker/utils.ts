@@ -41,6 +41,20 @@ export function getContainerName(walletAddress: string): string {
 }
 
 /**
+ * Get the Docker named volume that backs a wallet's workspace.
+ *
+ * Mounted at `getWorkspacePath()` so project files and the Stellar home
+ * survive `docker rm` and image rebuilds. Named per wallet so two wallets never
+ * share a workspace. Retained by default when a container is deleted (see
+ * `deleteContainer`).
+ * @param walletAddress The Stellar wallet public key
+ * @returns Volume name
+ */
+export function getWorkspaceVolumeName(walletAddress: string): string {
+  return `${getContainerName(walletAddress)}-workspace`;
+}
+
+/**
  * Get the base project path in container
  * @returns The project directory path
  */

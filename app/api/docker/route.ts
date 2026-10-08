@@ -24,7 +24,7 @@ renameProject
 
 export async function POST(request: Request) {
 try {
-const { action, walletAddress, filePath, content, publicKey, projectName, description, oldName, newName } = await request.json();
+const { action, walletAddress, filePath, content, publicKey, projectName, description, oldName, newName, removeVolume } = await request.json();
 
 // Validate wallet address is provided
 if (!walletAddress && action !== 'checkHealth') {
@@ -40,7 +40,9 @@ switch (action) {
     return NextResponse.json(createResult);
 
   case 'delete':
-    const deleteResult = await deleteContainer(walletAddress);
+    // The workspace volume is retained unless the caller explicitly opts in
+    // with `removeVolume: true`.
+    const deleteResult = await deleteContainer(walletAddress, { removeVolume });
     return NextResponse.json(deleteResult);
 
   case 'getFiles':

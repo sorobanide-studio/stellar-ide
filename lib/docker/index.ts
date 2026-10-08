@@ -19,6 +19,7 @@ export {
   getContainerName,
   getProjectPath,
   getWorkspacePath,
+  getWorkspaceVolumeName,
   formatDockerError,
   sleep,
 } from './utils';
