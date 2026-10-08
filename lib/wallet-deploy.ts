@@ -14,6 +14,27 @@ const SOROBAN_URL = "https://soroban-testnet.stellar.org";
 // Initialize server using the RPC module
 const server = new StellarRpc.Server(SOROBAN_URL);
 
+/**
+ * Generate a 32-byte cryptographically-random salt for contract deployment.
+ *
+ * Uses the Web Crypto API (`crypto.getRandomValues`) — the same primitive
+ * `@stellar/stellar-sdk` uses internally for `Keypair.random()`. Replaces the
+ * previous `Date.now()` + `Math.random()` combination, both of which are
+ * predictable within a single browser session and therefore
+ * attacker-influenceable.
+ *
+ * Returns a `Buffer` only because the Soroban SDK expects one at the
+ * `createCustomContract` boundary; the source of randomness is the typed
+ * array from `getRandomValues`, not a Buffer-based PRNG.
+ *
+ * Exported for testability.
+ */
+export function generateDeploymentSalt(): Buffer {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Buffer.from(bytes);
+}
+
 export async function deployWithWallet(
   walletAddress: string,
   logToTerminal: (msg: string, type: string) => void,
@@ -161,14 +182,11 @@ export async function deployWithWallet(
     // 5. Create contract instance
     const freshAccount = await server.getAccount(address);
     
-    // Create a 32-byte salt using crypto
-    const saltBuffer = Buffer.alloc(32);
-    const timestamp = Date.now().toString();
-    const randomBytes = Buffer.from(Math.random().toString(36).substring(2));
-    
-    // Fill the salt buffer with timestamp and random data
-    Buffer.from(timestamp).copy(saltBuffer, 0);
-    randomBytes.copy(saltBuffer, timestamp.length);
+    // 32-byte cryptographically-random salt (no timestamp prefix, no Math.random()).
+    // Both Date.now() and Math.random() are predictable within a single
+    // browser session — using crypto.getRandomValues guarantees an
+    // attacker-uninfluenceable contract address.
+    const saltBuffer = generateDeploymentSalt();
     
     const createTx = new StellarSdk.TransactionBuilder(freshAccount, {
       fee: StellarSdk.BASE_FEE,
