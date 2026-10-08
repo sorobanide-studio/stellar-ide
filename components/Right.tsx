@@ -203,9 +203,6 @@ export default function Right({
     }
   }, [wallet.isConnected, wallet.walletAddress, checkAndSetContainerName]);
 
-  // Deploy Contract: hooks/archived/useContractDeployment.ts
-  // Create Account: hooks/archived/useAccountCreation.ts
-
   return (
     <div className="flex flex-col h-full bg-[#171717] overflow-hidden">
       {mounted && !wallet.isConnected && (
