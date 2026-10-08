@@ -22,14 +22,28 @@ export function convertToMonacoMarkers(diagnostics: Diagnostic[]): MonacoMarker[
 }
 
 /**
- * Find matching Monaco model for a given URI
- * Uses multiple strategies to match URIs
+ * Split a `file://` URI into its non-empty path segments.
+ */
+function uriPathSegments(uri: string): string[] {
+  return uri.replace(/^file:\/\//, '').split('/').filter(Boolean);
+}
+
+/**
+ * Find matching Monaco model for a given URI.
+ *
+ * Matches on the full path first, then on a suffix/prefix path (which includes
+ * the containing directory). The previous filename-only match, and the blind
+ * "first .rs model" fallback in the caller, applied a diagnostic for one
+ * crate's `lib.rs` to another crate's `lib.rs`. A URI that cannot be
+ * attributed now returns null so the caller drops the markers.
  */
 export function findMatchingModel(
   models: MonacoModel[],
   uri: string
 ): MonacoModel | null {
-  const diagnosticFilename = uri.split('/').pop() || '';
+  const diagnosticSegments = uriPathSegments(uri);
+  const diagnosticPath = diagnosticSegments.join('/');
+  const diagnosticFilename = diagnosticSegments[diagnosticSegments.length - 1] || '';
 
   for (const model of models) {
     const modelUri = model.uri?.toString() || '';
@@ -40,17 +54,24 @@ export function findMatchingModel(
       return model;
     }
 
-    // Strategy 2: Both URIs contain same filename
-    const modelFilename = modelUri.split('/').pop() || '';
-    if (modelFilename === diagnosticFilename && diagnosticFilename.endsWith('.rs')) {
-      console.log('[LSP Diagnostics] ✓ Filename match:', diagnosticFilename);
+    const modelSegments = uriPathSegments(modelUri);
+    const modelPath = modelSegments.join('/');
+
+    // Strategy 2: Same normalised path (differing only by `file://` prefix)
+    if (modelPath && modelPath === diagnosticPath) {
+      console.log('[LSP Diagnostics] ✓ Normalised path match');
       return model;
     }
 
-    // Strategy 3: Path contains the other
-    const uriPath = uri.replace('file://', '');
-    if (modelUri.includes(uriPath) || uriPath.includes(modelUri.replace('file://', ''))) {
-      console.log('[LSP Diagnostics] ✓ Path contains match');
+    // Strategy 3: A full path (directory + filename) is a suffix/prefix of the
+    // other, so two different crates' `lib.rs` files never match on filename
+    // alone.
+    if (
+      diagnosticFilename.endsWith('.rs') &&
+      (modelPath.endsWith('/' + diagnosticPath) ||
+        diagnosticPath.endsWith('/' + modelPath))
+    ) {
+      console.log('[LSP Diagnostics] ✓ Path-segment match:', diagnosticPath);
       return model;
     }
   }
@@ -91,26 +112,21 @@ export function applyMarkersToEditor(
     console.log('[LSP Diagnostics] Available models:', models.map(m => m.uri?.toString()));
     console.log('[LSP Diagnostics] Diagnostic URI:', uri);
 
-    // Find matching model
-    let model = findMatchingModel(models, uri);
+    // Find matching model. If none matches we must NOT guess: applying markers
+    // to an arbitrary .rs model paints diagnostics onto a file with no error.
+    const model = findMatchingModel(models, uri);
 
-    // Fallback: use first .rs model if no match found
     if (!model) {
-      console.warn('[LSP Diagnostics] Model not found for URI:', uri);
-      model = models.find(m => m.uri?.toString().endsWith('.rs')) || null;
-      if (model) {
-        console.log('[LSP Diagnostics]Using fallback .rs model');
-      }
+      console.warn(
+        `[LSP Diagnostics] No matching model for URI: ${uri}; dropping ${markers.length} marker(s)`
+      );
+      return;
     }
 
-    if (model) {
-      // Clear existing markers first, then set new ones
-      editor.setModelMarkers(model, 'rust-analyzer', []);
-      editor.setModelMarkers(model, 'rust-analyzer', markers);
-      console.log(`[LSP Diagnostics] ✓ Set ${markers.length} markers on model`);
-    } else {
-      console.error('[LSP Diagnostics] No suitable model found');
-    }
+    // Clear existing markers first, then set new ones
+    editor.setModelMarkers(model, 'rust-analyzer', []);
+    editor.setModelMarkers(model, 'rust-analyzer', markers);
+    console.log(`[LSP Diagnostics] ✓ Set ${markers.length} markers on model`);
   };
 
   applyWithRetry(0);
