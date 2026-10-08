@@ -532,13 +532,15 @@ POST /api/docker
 
 **Available Actions:**
 
-- `createProject` - Create and initialize a new container
-- `deleteProject` - Stop and remove a container
-- `getFiles` - List all files in a project
-- `getFileContent` - Read file content
-- `saveFileContent` - Write file content
-- `buildProject` - Build the contract
-- `deployProject` - Deploy the contract
+- `create` - Create and initialize the wallet's container
+- `delete` - Stop and remove the wallet's container
+- `checkHealth` - Report whether the container is running
+- `getFiles` / `getFileContent` / `saveFileContent` / `createFile` / `createFolder` / `deleteFile` / `deleteFolder` - File operations
+- `createAccount` - Generate and fund a testnet Stellar identity
+- `buildContract` / `deployContract` - Build and deploy the contract
+- `getAllProjects` / `createProject` / `deleteProject` / `getProject` / `renameProject` - Project management
+
+Every action is a `POST /api/docker` and takes a `walletAddress` (the guard exempts `checkHealth`, but it still needs one to identify the container). See the [API Reference](#api-reference) for the request fields and response shape of each action.
 
 ### Manual Docker Commands (Advanced)
 
@@ -571,102 +573,129 @@ For detailed Docker setup instructions, see [DOCKER_SETUP.md](./DOCKER_SETUP.md)
 
 ## API Reference
 
-### Project Management
-
-#### Create Project
+All container and project operations are handled by one Next.js route handler:
 
 ```
 POST /api/docker
 Content-Type: application/json
+```
 
+`app/api/docker/route.ts` destructures the body as
+`{ action, walletAddress, filePath, content, publicKey, projectName, description, oldName, newName }`.
+There is **no** `projectId`, `userId` or `network` field in the handler. Every action except
+`checkHealth` requires a `walletAddress`; a missing wallet returns
+`400 { "error": "Wallet address is required" }`, an unrecognised action returns
+`400 { "error": "Unknown action" }`, and an unhandled exception returns
+`500 { "error": "Internal server error", "details": "..." }`.
+
+### Actions
+
+| `action` | Fields beyond `action` | Handler |
+| --- | --- | --- |
+| `create` | `walletAddress` | `createAndInitializeContainer` |
+| `delete` | `walletAddress` | `deleteContainer` |
+| `getFiles` | `walletAddress`, `projectName` | `getContainerFiles` |
+| `getFileContent` | `walletAddress`, `projectName`, `filePath` | `getFileContent` |
+| `saveFileContent` | `walletAddress`, `projectName`, `filePath`, `content` | `saveFileContent` |
+| `createFile` | `walletAddress`, `projectName`, `filePath` | `createFile` |
+| `createFolder` | `walletAddress`, `projectName`, `filePath` | `createFolder` |
+| `deleteFile` | `walletAddress`, `projectName`, `filePath` | `deleteFile` |
+| `deleteFolder` | `walletAddress`, `projectName`, `filePath` | `deleteFolder` |
+| `createAccount` | `walletAddress` | `createAccount` |
+| `buildContract` | `walletAddress`, `projectName` | `buildContract` |
+| `deployContract` | `walletAddress`, `projectName` (`publicKey` optional) | `deployContract` |
+| `getAllProjects` | `walletAddress` | `getAllProjects` |
+| `createProject` | `walletAddress`, `projectName`, `description` | `createProject` |
+| `deleteProject` | `walletAddress`, `projectName` | `deleteProject` |
+| `getProject` | `walletAddress`, `projectName` | `getProject` |
+| `renameProject` | `walletAddress`, `oldName`, `newName` | `renameProject` |
+| `checkHealth` | `walletAddress` | `checkContainerHealth` |
+
+### Container
+
+#### Create
+
+```
+POST /api/docker
 {
-  "action": "createProject",
-  "userId": "1",
-  "projectName": "My Contract",
-  "description": "A sample contract"
+  "action": "create",
+  "walletAddress": "GBUQWP3K..."
 }
 
 Response:
 {
   "success": true,
-  "projectId": "project-123",
-  "message": "Project created successfully"
+  "containerName": "soroban-gbuqwp3k",
+  "message": "Container soroban-gbuqwp3k ready for use"
 }
 ```
 
-#### Delete Project
+#### Delete
 
 ```
 POST /api/docker
-Content-Type: application/json
-
 {
-  "action": "deleteProject",
-  "projectId": "project-123"
+  "action": "delete",
+  "walletAddress": "GBUQWP3K..."
 }
 
 Response:
 {
   "success": true,
-  "message": "Project deleted successfully"
+  "containerName": "soroban-gbuqwp3k",
+  "message": "Container soroban-gbuqwp3k deleted"
 }
 ```
 
-#### Get All Projects
+#### Check health
 
 ```
 POST /api/docker
-Content-Type: application/json
-
 {
-  "action": "getAllProjects",
-  "userId": "1"
+  "action": "checkHealth",
+  "walletAddress": "GBUQWP3K..."
 }
 
 Response:
 {
-  "success": true,
-  "projects": [
-    {
-      "id": "project-123",
-      "name": "My Contract",
-      "createdAt": "2024-01-15T10:30:00Z",
-      "description": "A sample contract"
-    }
-  ]
+  "isHealthy": true,
+  "walletAddress": "GBUQWP3K..."
 }
 ```
 
-### File Operations
+### Files
 
-#### Get Files
+#### Get files
+
+`files` is a list of project-relative path strings, not objects:
 
 ```
 POST /api/docker
 {
   "action": "getFiles",
-  "projectId": "project-123",
-  "path": "/src"
+  "walletAddress": "GBUQWP3K...",
+  "projectName": "hello-soroban"
 }
 
 Response:
 {
   "success": true,
-  "files": [
-    { "name": "lib.rs", "type": "file", "path": "/src/lib.rs" },
-    { "name": "config", "type": "directory", "path": "/src/config" }
-  ]
+  "files": ["Cargo.toml", "src/lib.rs", "src/test.rs"]
 }
 ```
 
-#### Get File Content
+With no `projectName` the handler returns an empty list:
+`{ "success": true, "files": [], "message": "Please select a project to open" }`.
+
+#### Get file content
 
 ```
 POST /api/docker
 {
   "action": "getFileContent",
-  "projectId": "project-123",
-  "filePath": "/src/lib.rs"
+  "walletAddress": "GBUQWP3K...",
+  "projectName": "hello-soroban",
+  "filePath": "src/lib.rs"
 }
 
 Response:
@@ -676,59 +705,121 @@ Response:
 }
 ```
 
-#### Save File Content
+#### Save file content
 
 ```
 POST /api/docker
 {
   "action": "saveFileContent",
-  "projectId": "project-123",
-  "filePath": "/src/lib.rs",
+  "walletAddress": "GBUQWP3K...",
+  "projectName": "hello-soroban",
+  "filePath": "src/lib.rs",
   "content": "// Updated code here\n..."
 }
 
 Response:
 {
   "success": true,
-  "message": "File saved successfully"
+  "message": "File saved"
 }
 ```
+
+`createFile`, `createFolder`, `deleteFile` and `deleteFolder` take the same
+`walletAddress` / `projectName` / `filePath` fields and return
+`{ "success": true, "message": "..." }` with the path echoed in the message.
+
+### Projects
+
+#### Get all projects
+
+```
+POST /api/docker
+{
+  "action": "getAllProjects",
+  "walletAddress": "GBUQWP3K..."
+}
+
+Response:
+{
+  "success": true,
+  "projects": [
+    {
+      "id": "project_hello-soroban",
+      "name": "hello-soroban",
+      "createdAt": "2026-10-08T10:30:00.000Z",
+      "description": "Soroban contract project",
+      "contractType": "soroban"
+    }
+  ]
+}
+```
+
+#### Create / get / rename / delete project
+
+```
+POST /api/docker
+{
+  "action": "createProject",
+  "walletAddress": "GBUQWP3K...",
+  "projectName": "hello-soroban",
+  "description": "My first contract"
+}
+
+Response:
+{
+  "success": true,
+  "project": {
+    "id": "project_hello-soroban",
+    "name": "hello-soroban",
+    "description": "My first contract",
+    "contractType": "soroban"
+  }
+}
+```
+
+- `getProject` (`walletAddress`, `projectName`) returns `{ "success": true, "project": { ... } }`
+- `renameProject` (`walletAddress`, `oldName`, `newName`) returns `{ "success": true, "project": { ... } }`
+- `deleteProject` (`walletAddress`, `projectName`) returns `{ "success": true }`
 
 ### Build & Deploy
 
-#### Build Contract
+#### Build contract
 
 ```
 POST /api/docker
 {
-  "action": "buildProject",
-  "projectId": "project-123"
-}
-
-Response:
-  "success": true,
-  "wasmPath": "/path/to/contract.wasm",
-  "output": "Build output logs..."
-}
-```
-
-#### Deploy Contract
-
-```
-POST /api/docker
-{
-  "action": "deployProject",
-  "projectId": "project-123",
-  "walletAddress": "G...",
-  "network": "testnet"
+  "action": "buildContract",
+  "walletAddress": "GBUQWP3K...",
+  "projectName": "hello-soroban"
 }
 
 Response:
 {
   "success": true,
-  "contractId": "C...",
-  "transactionHash": "tx-hash-...",
-  "message": "Contract deployed successfully"
+  "wasmBase64": "<base64-encoded wasm>",
+  "wasmSize": 12345,
+  "buildOutput": "Build completed successfully"
+}
+```
+
+#### Deploy contract
+
+```
+POST /api/docker
+{
+  "action": "deployContract",
+  "walletAddress": "GBUQWP3K...",
+  "publicKey": "GBUQWP3K...",
+  "projectName": "hello-soroban"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Contract deployed successfully",
+  "output": "<combined stdout/stderr>",
+  "stdout": "...",
+  "stderr": ""
 }
 ```
 
