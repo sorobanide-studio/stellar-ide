@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
-import Sidebar from "./Sidebar";
-import EditorPanel from "./EditorPanel";
+import Sidebar from "./Sidebar/index";
+import EditorPanel from "./Editor";
 import TopBar from "./TopBar";
 import ErrorBanner from "./ErrorBanner";
 import { useWallet as useWalletContext } from "../context/WalletContext";
