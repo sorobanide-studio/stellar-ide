@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        # `next build` is the only whole-app check. The output is tee'd to
+        # build.log so a failure can be diagnosed from the job log and the
+        # uploaded artifact, and `pipefail` makes this step fail -- not just the
+        # warning gate below -- when the build exits non-zero.
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build.log
+      - name: Fail on new build warnings
+        # Warning budget. The baseline was measured on this tree: Turbopack
+        # reports "encountered 5 warnings", all five of them the module
+        # resolution warnings raised by `postcss.config.mjs`. Lower this number
+        # as warnings are removed; raise it only deliberately, in the pull
+        # request that adds a warning.
+        env:
+          BUILD_WARNING_THRESHOLD: "5"
+        run: |
+          # Turbopack prints one "encountered N warnings" summary; some Next.js
+          # build modes also print a line per warning. Count both and take the
+          # larger, so the gate neither misses the summary nor double-counts a
+          # warning that appears in both places.
+          summary=$( (grep -Eo 'encountered [0-9]+ warnings?' build.log || true) | (grep -Eo '[0-9]+' || true) | awk '{s+=$1} END{print s+0}' )
+          labelled=$(grep -Eci '^[[:space:]]*(⚠|warn(ing)?[: ])' build.log || true)
+          warnings=$(( summary > labelled ? summary : labelled ))
+          echo "next build emitted ${warnings} warning line(s); the budget is ${BUILD_WARNING_THRESHOLD}."
+          if [ "$warnings" -gt "$BUILD_WARNING_THRESHOLD" ]; then
+            echo "::error::next build emitted ${warnings} warning line(s), over the ${BUILD_WARNING_THRESHOLD}-warning budget."
+            grep -Ein 'warn' build.log | head -20 || true
+            exit 1
+          fi
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build-log
+          path: build.log
+          if-no-files-found: ignore
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+
+  ci-success:
+    name: ci-success
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, build, test]
+    if: always()
+    steps:
+      - name: Fail if any required job did not succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS"
+          bad=$(echo "$NEEDS" | jq -r 'to_entries[] | select(((.value.result == "success")) | not) | .key')
+          if [ -n "$bad" ]; then
+            echo "::error::These jobs did not succeed: $bad"
+            exit 1
+          fi
+          echo "All required jobs succeeded."
