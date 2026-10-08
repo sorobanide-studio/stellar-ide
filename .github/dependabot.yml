@@ -1,0 +1,42 @@
+version: 2
+updates:
+  # Root Next.js application.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Keep the Soroban toolchain moving together.
+      stellar:
+        patterns:
+          - "@stellar/*"
+      # Keep the editor toolchain moving together.
+      monaco:
+        patterns:
+          - "@monaco-editor/*"
+          - "monaco-editor"
+
+  # The language server is a second npm package with its own lockfile.
+  - package-ecosystem: npm
+    directory: "/stellar-lsp-server"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps-lsp)"
+
+  # Keep the actions pinned in .github/workflows/ci.yml current.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
