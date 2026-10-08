@@ -71,7 +71,7 @@ export async function createAndInitializeContainer(walletAddress: string) {
     if (!containerExists) {
       console.log(`Creating new container: ${containerName}`);
       const { stdout: createOutput } = await execAsync(
-        `docker run -d --name ${containerName} -e STELLAR_HOME=/home/developer/workspace/.stellar stellar-sandbox:v1 tail -f /dev/null`
+        `docker run -d --name ${containerName} -e STELLAR_HOME=/home/developer/.stellar stellar-sandbox:v1 tail -f /dev/null`
       );
       console.log('Container created:', createOutput.trim());
 

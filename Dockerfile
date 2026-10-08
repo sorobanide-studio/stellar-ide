@@ -53,8 +53,10 @@ RUN ARCH=$(dpkg --print-architecture) && \
 
 ENV PATH="/home/developer/.local/bin:${PATH}"
 
-# Set Stellar home directory to workspace for easier access
-ENV STELLAR_HOME=/home/developer/workspace/.stellar
+# Keep the Stellar home (identities) in the container user's home, OUTSIDE the
+# workspace that project listing/creation/deletion operate on, so deleting a
+# project cannot destroy the wallet identity.
+ENV STELLAR_HOME=/home/developer/.stellar
 
 # Verify installations
 RUN rustc --version && stellar --version && rust-analyzer --version

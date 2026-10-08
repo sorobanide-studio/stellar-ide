@@ -7,7 +7,7 @@
 import {
   execAsync,
   getContainerName,
-  getProjectPath,
+  getCredentialBackupPath,
 } from './utils';
 
 /**
@@ -18,7 +18,6 @@ import {
 export async function createAccount(userId: string) {
   try {
     const containerName = getContainerName(userId);
-    const projectPath = getProjectPath();
 
     console.log(`Creating account in container: ${containerName}`);
 
@@ -32,17 +31,21 @@ export async function createAccount(userId: string) {
       console.error('Account creation error:', stderr);
     }
 
-    // Copy .config folder to workspace after account creation
-    console.log(`Copying .config folder to workspace...`);
+    // Identity material stays in the container user's home (STELLAR_HOME). If a
+    // backup is wanted, write it OUTSIDE the workspace and name it after the
+    // wallet — never copy `.config` into the project directory, because deleting
+    // a project would then destroy the wallet identity.
+    const backupPath = getCredentialBackupPath(userId);
+    console.log(`Backing up credentials to ${backupPath}...`);
     try {
       await execAsync(
-        `docker exec ${containerName} cp -r /home/developer/.config ${projectPath}/.config`,
+        `docker exec -u developer ${containerName} sh -c "mkdir -p ${backupPath} && rm -rf ${backupPath}/.config && cp -r /home/developer/.config ${backupPath}/.config"`,
         { timeout: 10000 }
       );
-      console.log('.config folder copied to workspace');
+      console.log(`Credentials backed up to ${backupPath}`);
     } catch (copyError: any) {
-      console.error('Warning: Failed to copy .config folder:', copyError.message);
-      // Don't fail the account creation if copy fails
+      console.error('Warning: Failed to back up credentials:', copyError.message);
+      // Don't fail the account creation if the backup fails
     }
 
     return {
@@ -157,24 +160,25 @@ export async function getAccountStatus(userId: string, accountName: string = 'da
 }
 
 /**
- * Backup account credentials to workspace
+ * Backup account credentials outside the project workspace
  * @param userId The user ID
  * @returns Backup result
  */
 export async function backupCredentials(userId: string) {
   try {
     const containerName = getContainerName(userId);
-    const projectPath = getProjectPath();
+    const backupPath = getCredentialBackupPath(userId);
 
     console.log(`Backing up credentials in container: ${containerName}`);
 
-    // Copy .config folder to workspace
+    // Copy .config to a wallet-named directory outside the workspace, so a
+    // project delete cannot remove the wallet identity.
     await execAsync(
-      `docker exec ${containerName} cp -r /home/developer/.config ${projectPath}/.config`,
+      `docker exec -u developer ${containerName} sh -c "mkdir -p ${backupPath} && rm -rf ${backupPath}/.config && cp -r /home/developer/.config ${backupPath}/.config"`,
       { timeout: 10000 }
     );
 
-    console.log('Credentials backed up to workspace');
+    console.log(`Credentials backed up to ${backupPath}`);
 
     return {
       success: true,
