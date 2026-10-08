@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Ensure shellcheck is available
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck
+          fi
+          shellcheck --version
+      - name: Lint the extracted shell fragments
+        # scripts/*.sh hold the shell fragments that used to live inside
+        # TypeScript template literals, so shellcheck can finally see them.
+        run: shellcheck --severity=warning scripts/*.sh
+      - name: Lint the Dockerfile RUN commands
+        # shellcheck cannot read a Dockerfile, so extract every RUN body (joining
+        # backslash continuations) and lint the result as one POSIX shell script.
+        run: |
+          awk '
+            /^[[:space:]]*RUN([[:space:]]|$)/ {
+              sub(/^[[:space:]]*RUN[[:space:]]*/, "")
+              printf "%s", $0
+              while ($0 ~ /\\$/) { getline; printf "\n%s", $0 }
+              print ""
+              next
+            }
+          ' Dockerfile > /tmp/dockerfile-runs.sh
+          echo "--- Dockerfile RUN bodies extracted for shellcheck ---"
+          cat /tmp/dockerfile-runs.sh
+          shellcheck --severity=warning --shell=sh /tmp/dockerfile-runs.sh
+
+  ci-success:
+    name: ci-success
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, build, test, shellcheck]
+    if: always()
+    steps:
+      - name: Fail if any required job did not succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS"
+          bad=$(echo "$NEEDS" | jq -r 'to_entries[] | select(((.value.result == "success")) | not) | .key')
+          if [ -n "$bad" ]; then
+            echo "::error::These jobs did not succeed: $bad"
+            exit 1
+          fi
+          echo "All required jobs succeeded."

@@ -8,6 +8,7 @@ import {
   execAsync,
   getContainerName,
   getWorkspacePath,
+  scriptCommand,
   sleep,
 } from './utils';
 
@@ -42,7 +43,7 @@ export async function createAndInitializeContainer(walletAddress: string) {
           
           // Just verify contract exists, don't reinitialize
           const { stdout: verifyDir } = await execAsync(
-            `docker exec ${containerName} test -d ${getWorkspacePath()}/soroban-hello-world && echo "exists" || echo "missing"`
+            scriptCommand('path-exists.sh', containerName, 'd', `${getWorkspacePath()}/soroban-hello-world`)
           );
           
           if (verifyDir.trim() === 'exists') {
@@ -111,7 +112,7 @@ export async function createAndInitializeContainer(walletAddress: string) {
 
     // Verify the directory was created
     const { stdout: verifyDir } = await execAsync(
-      `docker exec ${containerName} test -d ${getWorkspacePath()}/soroban-hello-world && echo "exists" || echo "missing"`
+      scriptCommand('path-exists.sh', containerName, 'd', `${getWorkspacePath()}/soroban-hello-world`)
     );
 
     if (verifyDir.trim() !== 'exists') {

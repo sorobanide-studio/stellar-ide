@@ -8,7 +8,7 @@ import {
   getContainerName,
   getWorkspacePath,
   escapeFilePath,
-  escapeShellArg,
+  scriptCommand,
 } from '../utils';
 
 /**
@@ -36,7 +36,7 @@ export async function saveFileContent(walletAddress: string, filePath: string, c
 
     // First verify the file exists
     const { stdout: fileCheck } = await execAsync(
-      `docker exec ${containerName} test -f ${fullPath} && echo "exists" || echo "missing"`
+      scriptCommand('path-exists.sh', containerName, 'f', fullPath)
     );
 
     if (fileCheck.trim() === 'missing') {
@@ -57,9 +57,7 @@ export async function saveFileContent(walletAddress: string, filePath: string, c
 
     // Write file to container using base64 decoding
     await execAsync(
-      `docker exec -u developer ${containerName} sh -c "echo ${escapeShellArg(
-        base64Content
-      )} | base64 -d > ${fullPath}"`,
+      scriptCommand('write-file-content.sh', containerName, fullPath, base64Content),
       { timeout: 10000 }
     );
 
@@ -105,9 +103,7 @@ export async function createFile(walletAddress: string, filePath: string, conten
     if (content) {
       const base64Content = Buffer.from(content).toString('base64');
       await execAsync(
-        `docker exec -u developer ${containerName} sh -c "echo ${escapeShellArg(
-          base64Content
-        )} | base64 -d > ${fullPath}"`
+        scriptCommand('write-file-content.sh', containerName, fullPath, base64Content)
       );
     } else {
       await execAsync(`docker exec -u developer ${containerName} touch ${fullPath}`);

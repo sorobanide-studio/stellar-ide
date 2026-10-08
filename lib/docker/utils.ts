@@ -5,6 +5,7 @@
  */
 
 import { exec } from 'child_process';
+import path from 'path';
 import { promisify } from 'util';
 
 export const execAsync = promisify(exec);
@@ -26,6 +27,23 @@ export function escapeShellArg(arg: string): string {
  */
 export function escapeFilePath(path: string): string {
   return path.replace(/^\/+/, '').replace(/\.\./g, '');
+}
+
+/**
+ * Absolute path to one of the extracted shell fragments under `scripts/`.
+ * The fragments are plain POSIX shell that shellcheck lints in CI.
+ */
+export function getScriptPath(scriptName: string): string {
+  return path.join(process.cwd(), 'scripts', scriptName);
+}
+
+/**
+ * Build a command that runs one of the extracted `scripts/*.sh` fragments
+ * with an explicit `sh`, so the shell executing the fragment is not
+ * incidental, and every argument is quoted.
+ */
+export function scriptCommand(scriptName: string, ...args: string[]): string {
+  return ['sh', getScriptPath(scriptName), ...args].map(escapeShellArg).join(' ');
 }
 
 /**
