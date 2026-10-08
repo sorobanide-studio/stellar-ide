@@ -7,16 +7,6 @@ import type { editor, languages, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 import type { DocumentSymbol } from "../../lib/lsp/requests";
 
-// Global state
-let documentSymbolProviderRegistered = false;
-
-/**
- * Check if document symbol provider is already registered
- */
-export function isDocumentSymbolProviderRegistered(): boolean {
-  return documentSymbolProviderRegistered;
-}
-
 /**
  * Request document symbols from LSP
  */
@@ -69,17 +59,11 @@ function convertToMonacoDocumentSymbol(
 
 /**
  * Register the document symbol provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerDocumentSymbolProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (documentSymbolProviderRegistered) {
-    return null;
-  }
-
-  documentSymbolProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerDocumentSymbolProvider("rust", {
     provideDocumentSymbols: async (
       model: editor.ITextModel,

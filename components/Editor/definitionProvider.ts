@@ -6,16 +6,6 @@
 import type { editor, languages, Position, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let definitionProviderRegistered = false;
-
-/**
- * Check if definition provider is already registered
- */
-export function isDefinitionProviderRegistered(): boolean {
-  return definitionProviderRegistered;
-}
-
 /**
  * Request definition from LSP
  */
@@ -77,17 +67,11 @@ function convertToMonacoDefinition(
 
 /**
  * Register the definition provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerDefinitionProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (definitionProviderRegistered) {
-    return null;
-  }
-
-  definitionProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerDefinitionProvider("rust", {
     provideDefinition: async (
       model: editor.ITextModel,

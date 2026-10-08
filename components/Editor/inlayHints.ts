@@ -8,7 +8,6 @@ import type { MonacoType, InlayHint, InlayHintsCache } from "./types";
 import { HINTS_CACHE_TTL } from "./constants";
 
 // Global state for inlay hints
-let inlayHintsProviderRegistered = false;
 let inlayHintsCache: InlayHintsCache | null = null;
 let pendingHintsRequest: Promise<InlayHint[]> | null = null;
 let pendingRequestUri: string | null = null;
@@ -22,13 +21,6 @@ export function invalidateHintsCache(): void {
   inlayHintsCache = null;
   pendingHintsRequest = null;
   pendingRequestUri = null;
-}
-
-/**
- * Check if inlay hints provider is already registered
- */
-export function isProviderRegistered(): boolean {
-  return inlayHintsProviderRegistered;
 }
 
 /**
@@ -80,17 +72,11 @@ function convertHintsToMonaco(
 
 /**
  * Register the inlay hints provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerInlayHintsProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (inlayHintsProviderRegistered) {
-    return null;
-  }
-
-  inlayHintsProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerInlayHintsProvider("rust", {
     provideInlayHints: async (
       model: editor.ITextModel,
