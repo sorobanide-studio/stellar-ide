@@ -17,6 +17,7 @@ export {
   escapeShellArg,
   escapeFilePath,
   getContainerName,
+  getIdentityName,
   getProjectPath,
   getWorkspacePath,
   formatDockerError,

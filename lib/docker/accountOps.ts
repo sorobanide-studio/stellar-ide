@@ -7,6 +7,7 @@
 import {
   execAsync,
   getContainerName,
+  getIdentityName,
   getProjectPath,
 } from './utils';
 
@@ -18,12 +19,13 @@ import {
 export async function createAccount(userId: string) {
   try {
     const containerName = getContainerName(userId);
+    const identity = getIdentityName(userId);
     const projectPath = getProjectPath();
 
-    console.log(`Creating account in container: ${containerName}`);
+    console.log(`Creating account in container: ${containerName} (identity: ${identity})`);
 
     const { stdout, stderr } = await execAsync(
-      `docker exec -u developer ${containerName} sh -c "stellar keys generate darshan --network testnet --fund"`,
+      `docker exec -u developer ${containerName} sh -c "stellar keys generate ${identity} --network testnet --fund"`,
       { timeout: 30000 }
     );
 
@@ -65,10 +67,11 @@ export async function createAccount(userId: string) {
 /**
  * Generate cryptographic keys for a Stellar account
  * @param userId The user ID
- * @param keyName The name of the key to generate
+ * @param keyName The wallet-derived identity name to generate (required so
+ *   every caller must pick the identity belonging to its wallet)
  * @returns Key generation result
  */
-export async function generateKeys(userId: string, keyName: string = 'darshan') {
+export async function generateKeys(userId: string, keyName: string) {
   try {
     const containerName = getContainerName(userId);
 
@@ -104,10 +107,11 @@ export async function generateKeys(userId: string, keyName: string = 'darshan') 
 /**
  * Get account information
  * @param userId The user ID
- * @param accountName The account name
+ * @param accountName The wallet-derived identity name (required so every
+ *   caller must ask about the identity belonging to its wallet)
  * @returns Account information
  */
-export async function getAccountStatus(userId: string, accountName: string = 'darshan') {
+export async function getAccountStatus(userId: string, accountName: string) {
   try {
     const containerName = getContainerName(userId);
 

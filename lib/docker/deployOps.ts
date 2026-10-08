@@ -7,6 +7,7 @@
 import {
   execAsync,
   getContainerName,
+  getIdentityName,
   getWorkspacePath,
 } from './utils';
 
@@ -20,6 +21,7 @@ import {
 export async function deployContract(userId: string, publicKey?: string, projectName?: string) {
   try {
     const containerName = getContainerName(userId);
+    const identity = getIdentityName(userId);
     const workspacePath = getWorkspacePath();
     const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
 
@@ -29,8 +31,8 @@ export async function deployContract(userId: string, publicKey?: string, project
     // Note: --source-account is always required (the account that pays for deployment)
     // --sign-with-key is optional (the key used to sign the transaction)
     const deployCmd = publicKey
-      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`
-      : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`;
+      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`
+      : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`;
 
     const { stdout, stderr } = await execAsync(
       `docker exec -u developer -w ${projectDir} ${containerName} sh -c "stellar contract build && cargo build --target wasm32v1-none --release && ${deployCmd}"`,
@@ -114,14 +116,15 @@ export async function getDeploymentStatus(userId: string, projectName?: string) 
 export async function buildAndDeploy(userId: string, publicKey?: string, projectName?: string) {
   try {
     const containerName = getContainerName(userId);
+    const identity = getIdentityName(userId);
     const workspacePath = getWorkspacePath();
     const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
 
     console.log(`Building and deploying contract in container: ${containerName}, project: ${projectName || 'default'}`);
 
     const deployCmd = publicKey
-      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`
-      : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`;
+      ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`
+      : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`;
 
     const { stdout, stderr } = await execAsync(
       `docker exec -u developer -w ${projectDir} ${containerName} sh -c "set -e; echo 'Starting build...'; stellar contract build; echo 'Building WASM...'; cargo build --target wasm32v1-none --release; echo 'Deploying...'; ${deployCmd}"`,
