@@ -19,13 +19,60 @@ export function escapeShellArg(arg: string): string {
 }
 
 /**
- * Escape file paths for Docker exec
- * Removes leading slashes and prevents path traversal
- * @param path The path to escape
- * @returns Sanitized path
+ * Normalise and escape a file path for Docker exec.
+ *
+ * The previous implementation stripped characters
+ * (`path.replace(/^\/+/, '').replace(/\.\./g, '')`), which let a bare `..`
+ * collapse to an empty string (i.e. the project root, so `deleteFolder` could
+ * `rm -rf` the whole project) and turned `a/../b` into `a/b` instead of
+ * resolving it. This normalises the path instead: absolute paths and any `..`
+ * segment that would escape the project root are rejected, `.` segments are
+ * resolved, and the result can never be empty (the project root itself).
+ *
+ * @param path The relative path to normalise
+ * @returns A normalised, non-empty, root-relative path
+ * @throws Error when the path is not a string, is absolute, or escapes the root
  */
 export function escapeFilePath(path: string): string {
-  return path.replace(/^\/+/, '').replace(/\.\./g, '');
+  if (typeof path !== 'string') {
+    throw new Error('Invalid file path: expected a string');
+  }
+
+  // Reject absolute POSIX, backslash and Windows drive paths outright.
+  if (
+    path.startsWith('/') ||
+    path.startsWith('\\') ||
+    /^[a-zA-Z]:[\\/]/.test(path)
+  ) {
+    throw new Error(
+      `Invalid file path: absolute paths are not allowed (${path})`
+    );
+  }
+
+  const resolved: string[] = [];
+  for (const segment of path.split(/[\\/]+/)) {
+    if (segment === '' || segment === '.') {
+      continue;
+    }
+    if (segment === '..') {
+      if (resolved.length === 0) {
+        throw new Error(
+          `Invalid file path: path escapes the project root (${path})`
+        );
+      }
+      resolved.pop();
+      continue;
+    }
+    resolved.push(segment);
+  }
+
+  if (resolved.length === 0) {
+    throw new Error(
+      `Invalid file path: path resolves to the project root (${path})`
+    );
+  }
+
+  return resolved.join('/');
 }
 
 /**
