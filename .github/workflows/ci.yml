@@ -1,0 +1,89 @@
+name: CI
+
+# Every action below is pinned to a full 40-character commit SHA with the release
+# version preserved in a trailing comment, so a moved tag cannot quietly swap the
+# code that runs with the workflow token. Dependabot (`.github/dependabot.yml`)
+# keeps these pins current, and the `pins` job fails the workflow if any `uses:`
+# line is ever tag- or branch-pinned again.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+
+  pins:
+    name: pins
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Fail if any action is not pinned to a full commit SHA
+        run: |
+          if grep -REn '^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*[^[:space:]]+@[^[:space:]]+' .github/workflows \
+              | grep -vE '@[0-9a-f]{40}([[:space:]]|$)'; then
+            echo "::error::Every 'uses:' reference must be pinned to a 40-character commit SHA."
+            exit 1
+          fi
+          echo "All 'uses:' references are pinned to a full commit SHA."
