@@ -747,26 +747,61 @@ This project is built with Next.js, React, and Monaco Editor.
 
 ## Development
 
-### Running in Development Mode
+### Quickstart for Contributors
+
+A fresh contributor can go from cloning the repository to passing local checks with the following steps:
 
 ```bash
-npm run dev
-```
+# 1. Clone the repository
+git clone https://github.com/sorobanide-studio/stellar-ide.git
+cd stellar-ide
 
-Server runs on `https://localhost:3000`
+# 2. Install dependencies
+npm install
 
-### Building for Production
-
-```bash
-npm run build
-npm start
-```
-
-### Linting
-
-```bash
+# 3. Verify local linting
 npm run lint
+
+# 4. Verify local production build
+npm run build
 ```
+
+### Available Scripts (`package.json`)
+
+Every script defined in `package.json` is documented below:
+
+| Script | Command | Description | Corresponding CI Job |
+| --- | --- | --- | --- |
+| `dev` | `next dev --experimental-https` | Starts the local Next.js development server with experimental HTTPS enabled at `https://localhost:3000`. | Local Development |
+| `build` | `next build` | Compiles the TypeScript application and creates the optimized Next.js production build. | `build` CI job |
+| `start` | `next start` | Runs the compiled Next.js production server locally (requires running `npm run build` first). | Production Serving |
+| `lint` | `eslint` | Executes ESLint to check for code quality, syntax issues, and formatting conformance. | `lint` CI job |
+| `test` | `npm test` | Runs the test suite when test files are present. | `test` CI job |
+
+### HTTPS & Self-Signed Certificate Behavior
+
+The development script uses `next dev --experimental-https` to run on `https://localhost:3000`. 
+
+- **Why HTTPS is Required:** The Freighter wallet API (`@stellar/freighter-api`) and web cryptographic APIs require a secure context (HTTPS) to interact with browser extensions and sign transactions securely.
+- **Browser Certificate Warning:** Because Next.js generates a self-signed TLS certificate during local development, your browser will display a security warning (e.g., *"Your connection is not private"* or *"Potential Security Risk Ahead"*).
+- **How to Proceed:** Click **"Advanced"** and select **"Proceed to localhost (unsafe)"** (or **"Accept the Risk and Continue"** in Firefox). This is expected behavior exclusively for local development.
+
+### Matching Local Commands to CI Checks
+
+Pull requests must pass all continuous integration checks. You can run the exact commands locally before pushing your branch:
+
+1. **Lint Check (CI `lint` job):**
+   ```bash
+   npm run lint
+   ```
+2. **Build Check (CI `build` job):**
+   ```bash
+   npm run build
+   ```
+3. **Test Suite (CI `test` job):**
+   ```bash
+   npm test --if-present
+   ```
 
 ---
 
