@@ -564,10 +564,16 @@ docker rm <container-name>
 
 - **Docker installed** on your system
 - **Docker daemon running** and accessible
-- **stellar-sandbox image** available (pre-built or pulled automatically)
+- **`stellar-sandbox:v1` image** built locally before you run the editor:
+
+  ```bash
+  docker build -t stellar-sandbox:v1 .
+  ```
+
+  The image is not published and is never pulled automatically; `lib/docker/containerOps.ts` creates containers from this exact tag.
 - Sufficient disk space for container images and project files
 
-For detailed Docker setup instructions, see [DOCKER_SETUP.md](./DOCKER_SETUP.md)
+See the [Docker Image](#docker-image) section above for the pinned toolchain and rebuild guidance.
 
 ## API Reference
 
