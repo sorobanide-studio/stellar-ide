@@ -21,7 +21,8 @@ export function isDocumentSymbolProviderRegistered(): boolean {
  * Request document symbols from LSP
  */
 async function requestDocumentSymbolsInfo(
-  uri: string
+  uri: string,
+  token?: CancellationToken
 ): Promise<DocumentSymbol[]> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestDocumentSymbols) {
@@ -29,7 +30,7 @@ async function requestDocumentSymbolsInfo(
   }
 
   try {
-    const result = await lspFn.requestDocumentSymbols(uri);
+    const result = await lspFn.requestDocumentSymbols(uri, token);
     return Array.isArray(result) ? result : [];
   } catch (error) {
     console.error("[DocumentSymbol] Error:", error);
@@ -83,11 +84,11 @@ export function registerDocumentSymbolProvider(
   const provider = monaco.languages.registerDocumentSymbolProvider("rust", {
     provideDocumentSymbols: async (
       model: editor.ITextModel,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.DocumentSymbol[]> => {
       const uri = model.uri.toString();
 
-      const symbols = await requestDocumentSymbolsInfo(uri);
+      const symbols = await requestDocumentSymbolsInfo(uri, token);
 
       if (symbols.length === 0) {
         return [];

@@ -23,7 +23,8 @@ export function isCodeActionProviderRegistered(): boolean {
 async function requestCodeActions(
   uri: string,
   range: { start: { line: number; character: number }; end: { line: number; character: number } },
-  context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number; message: string }> }
+  context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number; message: string }> },
+  token?: CancellationToken
 ): Promise<CodeAction[]> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestCodeAction) {
@@ -31,7 +32,7 @@ async function requestCodeActions(
   }
 
   try {
-    const result = await lspFn.requestCodeAction(uri, range, context);
+    const result = await lspFn.requestCodeAction(uri, range, context, token);
     return (result as CodeAction[]) || [];
   } catch (error) {
     console.error("[CodeAction] Error:", error);
@@ -74,7 +75,7 @@ export function registerCodeActionProvider(
       model: editor.ITextModel,
       range: Range,
       context: languages.CodeActionContext,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.CodeActionList | null> => {
       const uri = model.uri.toString();
 
@@ -109,7 +110,7 @@ export function registerCodeActionProvider(
 
       const lspContext = { diagnostics };
 
-      const actions = await requestCodeActions(uri, lspRange, lspContext);
+      const actions = await requestCodeActions(uri, lspRange, lspContext, token);
 
       if (actions.length === 0) {
         return { actions: [], dispose: () => {} };

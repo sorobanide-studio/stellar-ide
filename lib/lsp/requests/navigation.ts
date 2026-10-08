@@ -3,7 +3,7 @@
  * Code navigation features (definition, references, hover)
  */
 
-import { createRequestId } from './utils';
+import { awaitResponse, createRequestId, type CancellationTokenLike } from './utils';
 
 /**
  * Request go to definition
@@ -12,46 +12,34 @@ export function requestDefinition(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<unknown[]> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve([]);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve([]);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<unknown[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : result ? [result] : []),
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          const result = message.result;
-          resolve(Array.isArray(result) ? result : result ? [result] : []);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/definition',
+    params: {
+      textDocument: { uri },
+      position,
+    },
+    id: requestId,
+  }));
 
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve([]);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/definition',
-      params: {
-        textDocument: { uri },
-        position,
-      },
-      id: requestId,
-    }));
-  });
+  return response;
 }
 
 /**
@@ -62,47 +50,35 @@ export function requestReferences(
   uri: string,
   position: { line: number; character: number },
   context?: { includeDeclaration?: boolean },
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<unknown[]> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve([]);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve([]);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<unknown[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : []),
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          const result = message.result;
-          resolve(Array.isArray(result) ? result : []);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/references',
+    params: {
+      textDocument: { uri },
+      position,
+      context: context || { includeDeclaration: true },
+    },
+    id: requestId,
+  }));
 
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve([]);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/references',
-      params: {
-        textDocument: { uri },
-        position,
-        context: context || { includeDeclaration: true },
-      },
-      id: requestId,
-    }));
-  });
+  return response;
 }
 
 /**
@@ -112,45 +88,34 @@ export function requestHover(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<{ contents: string } | null> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve(null);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve(null);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<{ contents: string } | null>(
+    ws,
+    requestId,
+    timeout,
+    null,
+    (result) => (result as { contents: string }) || null,
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          resolve(message.result || null);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/hover',
+    params: {
+      textDocument: { uri },
+      position,
+    },
+    id: requestId,
+  }));
 
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve(null);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/hover',
-      params: {
-        textDocument: { uri },
-        position,
-      },
-      id: requestId,
-    }));
-  });
+  return response;
 }
 
 /**
@@ -178,45 +143,33 @@ export interface DocumentSymbol {
 export function requestDocumentSymbols(
   ws: WebSocket,
   uri: string,
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<DocumentSymbol[]> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve([]);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve([]);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<DocumentSymbol[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : []),
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          const result = message.result;
-          resolve(Array.isArray(result) ? result : []);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/documentSymbol',
+    params: {
+      textDocument: { uri },
+    },
+    id: requestId,
+  }));
 
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve([]);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/documentSymbol',
-      params: {
-        textDocument: { uri },
-      },
-      id: requestId,
-    }));
-  });
+  return response;
 }
 
 /**
@@ -237,44 +190,32 @@ export function requestDocumentHighlight(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<DocumentHighlight[]> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve([]);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve([]);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<DocumentHighlight[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : []),
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          const result = message.result;
-          resolve(Array.isArray(result) ? result : []);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/documentHighlight',
+    params: {
+      textDocument: { uri },
+      position,
+    },
+    id: requestId,
+  }));
 
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve([]);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/documentHighlight',
-      params: {
-        textDocument: { uri },
-        position,
-      },
-      id: requestId,
-    }));
-  });
+  return response;
 }

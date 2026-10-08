@@ -3,7 +3,7 @@
  * Code editing features (completion, signature help, formatting)
  */
 
-import { createRequestId, TextEdit } from './utils';
+import { awaitResponse, createRequestId, type CancellationTokenLike, TextEdit } from './utils';
 
 /**
  * Request code completion
@@ -12,47 +12,37 @@ export function requestCompletion(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<unknown[]> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve([]);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve([]);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<unknown[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => {
+      // Handle both array and {items: []} formats
+      return Array.isArray(result) ? result : (result as { items?: unknown[] })?.items || [];
+    },
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          const result = message.result;
-          // Handle both array and {items: []} formats
-          resolve(Array.isArray(result) ? result : result?.items || []);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/completion',
+    params: {
+      textDocument: { uri },
+      position,
+    },
+    id: requestId,
+  }));
 
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve([]);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/completion',
-      params: {
-        textDocument: { uri },
-        position,
-      },
-      id: requestId,
-    }));
-  });
+  return response;
 }
 
 /**
@@ -62,45 +52,34 @@ export function requestSignatureHelp(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<unknown | null> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve(null);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve(null);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<unknown | null>(
+    ws,
+    requestId,
+    timeout,
+    null,
+    (result) => result || null,
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          resolve(message.result || null);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/signatureHelp',
+    params: {
+      textDocument: { uri },
+      position,
+    },
+    id: requestId,
+  }));
 
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve(null);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/signatureHelp',
-      params: {
-        textDocument: { uri },
-        position,
-      },
-      id: requestId,
-    }));
-  });
+  return response;
 }
 
 /**
@@ -109,46 +88,35 @@ export function requestSignatureHelp(
 export function requestFormatting(
   ws: WebSocket,
   uri: string,
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<TextEdit[]> {
-  return new Promise((resolve) => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      resolve([]);
-      return;
-    }
+  if (ws.readyState !== WebSocket.OPEN) {
+    return Promise.resolve([]);
+  }
 
-    const requestId = createRequestId();
+  const requestId = createRequestId();
+  const response = awaitResponse<TextEdit[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (result as TextEdit[]) || [],
+    token
+  );
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.id === requestId) {
-          ws.removeEventListener('message', handleMessage);
-          resolve(message.result || []);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
-
-    ws.addEventListener('message', handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener('message', handleMessage);
-      resolve([]);
-    }, timeout);
-
-    ws.send(JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/formatting',
-      params: {
-        textDocument: { uri },
-        options: {
-          tabSize: 4,
-          insertSpaces: true,
-        },
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/formatting',
+    params: {
+      textDocument: { uri },
+      options: {
+        tabSize: 4,
+        insertSpaces: true,
       },
-      id: requestId,
-    }));
-  });
+    },
+    id: requestId,
+  }));
+
+  return response;
 }

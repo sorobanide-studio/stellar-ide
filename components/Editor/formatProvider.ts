@@ -19,14 +19,17 @@ export function isFormatProviderRegistered(): boolean {
 /**
  * Request formatting from LSP
  */
-async function requestFormatting(uri: string): Promise<TextEdit[]> {
+async function requestFormatting(
+  uri: string,
+  token?: CancellationToken
+): Promise<TextEdit[]> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestFormatting) {
     return [];
   }
 
   try {
-    const result = await lspFn.requestFormatting(uri);
+    const result = await lspFn.requestFormatting(uri, token);
     return (result as TextEdit[]) || [];
   } catch (error) {
     console.error("[Format] Error:", error);
@@ -70,11 +73,11 @@ export function registerFormatProvider(
       provideDocumentFormattingEdits: async (
         model: editor.ITextModel,
         _options: languages.FormattingOptions,
-        _token: CancellationToken
+        token: CancellationToken
       ): Promise<languages.TextEdit[]> => {
         const uri = model.uri.toString();
 
-        const edits = await requestFormatting(uri);
+        const edits = await requestFormatting(uri, token);
 
         if (edits.length === 0) {
           console.log("[Format] No edits returned from LSP");
