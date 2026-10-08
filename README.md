@@ -31,6 +31,7 @@ The screenshot above shows the main editor interface with the code editor, file 
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Docker Setup](#docker-setup)
 - [API Reference](#api-reference)
+- [Language Server (LSP)](#language-server-lsp)
 - [Troubleshooting](#troubleshooting)
 
 ## Installation
@@ -732,6 +733,47 @@ Response:
 }
 ```
 
+## Language Server (LSP)
+
+The editor's Rust intelligence - completion, hover, go-to-definition, diagnostics, formatting and
+rename - is not produced in the browser. It is served by a separate Node process in
+`stellar-lsp-server/`, which bridges a WebSocket to a `rust-analyzer` process running **inside your
+project's Docker container**.
+
+### How it fits together
+
+1. Monaco opens a WebSocket to the LSP server:
+   `ws://localhost:3001?containerId=<container-name>&workspace=/home/developer/workspace`
+   (`lib/lsp/hooks/useLSPConnection.ts`).
+2. The LSP server (`stellar-lsp-server/src/server.ts`) listens on **port 3001**, resolves the named
+   container through the Docker socket, and `docker exec`s `rust-analyzer` in the workspace path.
+3. `rust-analyzer` is baked into the `stellar-sandbox:v1` image (`rustup component add
+   rust-analyzer`), so no host-side Rust toolchain is needed - only the container and the LSP server
+   must be running.
+
+### Starting it
+
+`stellar-lsp-server/` is a separate package with its own dependencies. From a fresh clone:
+
+```bash
+cd stellar-lsp-server
+npm install
+npm run build     # tsc -> dist/
+npm start         # node dist/server.js
+```
+
+During development you can skip the build step and run the TypeScript directly:
+
+```bash
+cd stellar-lsp-server
+npm install
+npm run dev       # ts-node src/server.ts
+```
+
+Either form prints `LSP Server listening on port 3001`. The server needs access to the Docker daemon
+(it uses `/var/run/docker.sock`) and the target project container must already exist. Without the LSP
+server running, the editor still opens files but returns no completions, hover or navigation.
+
 ## Troubleshooting
 
 ### Common Issues and Solutions
@@ -792,6 +834,25 @@ Response:
 3. Try closing and reopening the file
 4. Refresh the page and open the file again
 5. Check available disk space on your system
+
+#### Issue: "No IntelliSense" / no completions or hover
+
+**Problem:** Monaco never receives language-server responses, so there is no autocomplete, hover,
+go-to-definition or inline diagnostics.
+
+**Solutions:**
+
+1. Start the LSP server and confirm it prints `LSP Server listening on port 3001`:
+   ```bash
+   cd stellar-lsp-server && npm install && npm run dev
+   ```
+2. Watch the browser console for `[LSP Connection]` messages and confirm nothing else is bound to
+   port 3001.
+3. Confirm the project's container is running: `docker ps --filter name=^soroban-`. The LSP server
+   execs `rust-analyzer` inside it.
+4. Confirm the image ships `rust-analyzer`: `docker exec <soroban-wallet-prefix> rust-analyzer --version`
+   (it is baked into `stellar-sandbox:v1`).
+5. Check the LSP server's own terminal output for `[ERROR]` lines.
 
 #### Issue: Slow Performance
 
