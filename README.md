@@ -71,6 +71,68 @@ The screenshot above shows the main editor interface with the code editor, file 
    - Navigate to `https://localhost:3000`
    - The application uses experimental HTTPS for wallet integration
 
+
+## Docker Image
+
+The editor compiles Soroban contracts inside an isolated Docker container. The image is **not** published — every contributor builds it locally from the repository root `Dockerfile`. The runtime (`lib/docker/containerOps.ts`) hardcodes the tag **`stellar-sandbox:v1`**; if you change the Dockerfile or want to use a different tag, you must update both the build command and `lib/docker/containerOps.ts` together, or the editor will fail to spawn containers.
+
+### Pinned toolchain
+
+The `Dockerfile` pins the following versions (verified against the build on 2026-10-08):
+
+| Tool | Version | Source |
+| --- | --- | --- |
+| Ubuntu | `22.04` | `FROM ubuntu:22.04` |
+| Rust | `stable` (latest as of build) via `rustup` minimal profile | `https://sh.rustup.rs` |
+| `wasm32v1-none` target | added to the stable toolchain | `rustup target add wasm32v1-none` |
+| `rust-analyzer` | latest component on the stable toolchain | `rustup component add rust-analyzer` |
+| Stellar CLI | **`v23.3.0`** | `https://github.com/stellar/stellar-cli/releases/download/v23.3.0/stellar-cli-23.3.0-<arch>-unknown-linux-gnu.tar.gz` |
+
+### Multi-architecture support
+
+The Dockerfile detects the build host architecture with `dpkg --print-architecture` and downloads the matching `stellar-cli` release asset:
+
+- `amd64` → `stellar-cli-23.3.0-x86_64-unknown-linux-gnu.tar.gz`
+- `arm64` → `stellar-cli-23.3.0-aarch64-unknown-linux-gnu.tar.gz`
+
+To build for a different architecture on a single host, use Docker's `--platform` flag:
+
+```bash
+# Build for arm64 on an amd64 host (uses QEMU emulation)
+docker build --platform linux/arm64 -t stellar-sandbox:v1 .
+
+# Build for amd64 (the default on x86_64 hosts)
+docker build -t stellar-sandbox:v1 .
+```
+
+### Build command
+
+```bash
+docker build -t stellar-sandbox:v1 .
+```
+
+The build runs as the `developer` user (UID 1000) created inside the image — it does not run as root. The final `WORKDIR` is `/home/developer/workspace`, and the default `CMD` is `/bin/bash`.
+
+### Verification step
+
+The Dockerfile ends with a verification step:
+
+```text
+RUN rustc --version && stellar --version && rust-analyzer --version
+```
+
+If any of these fail, the build fails. The image will be tagged `stellar-sandbox:v1` and the runtime in `lib/docker/containerOps.ts` will find it via that tag.
+
+### When to rebuild
+
+Rebuild the image (`docker build -t stellar-sandbox:v1 .`) whenever:
+
+1. **The Dockerfile changes** — any change to the pinned versions, the `apt-get install` list, the `rustup` invocations, or the `stellar-cli` release URL requires a rebuild.
+2. **A Rust target is added or removed** — `rustup target add` is baked into the image; the host `rustup` is not used at runtime.
+3. **A `stellar-cli` upgrade is desired** — bump the version in the `curl` URL AND the matching release asset name, then rebuild.
+
+If you change the tag (`stellar-sandbox:v1` → something else), update `lib/docker/containerOps.ts` in the same commit — the runtime looks up the container by that exact string.
+
 ## Getting Started
 
 ### Quick Start (5 minutes)
