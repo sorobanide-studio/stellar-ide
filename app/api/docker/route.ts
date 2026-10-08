@@ -12,7 +12,8 @@ deleteFolder,
 createAccount,
 deployContract,
 buildContract,
-checkContainerHealth
+checkContainerHealth,
+getToolchainVersions
 } from '@/lib/docker';
 import {
 getAllProjects,
@@ -106,7 +107,10 @@ switch (action) {
 
   case 'checkHealth':
     const isHealthy = await checkContainerHealth(walletAddress);
-    return NextResponse.json({ isHealthy, walletAddress });
+    const toolchainVersions = isHealthy
+      ? await getToolchainVersions(walletAddress)
+      : null;
+    return NextResponse.json({ isHealthy, walletAddress, toolchainVersions });
 
   default:
     return NextResponse.json(
