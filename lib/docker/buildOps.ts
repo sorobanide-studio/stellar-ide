@@ -7,7 +7,9 @@
 import {
   execAsync,
   getContainerName,
-  getWorkspacePath,
+  getWasmPath,
+  getWasmDepsPath,
+  resolveProjectDirectory,
 } from './utils';
 
 /**
@@ -19,10 +21,9 @@ import {
 export async function buildContract(userId: string, projectName?: string) {
   try {
     const containerName = getContainerName(userId);
-    const workspacePath = getWorkspacePath();
-    const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
-    const wasmPath = `${projectDir}/target/wasm32v1-none/release/hello_world.wasm`;
-    const wasmDepsPath = `${projectDir}/target/wasm32v1-none/release/deps/hello_world.wasm`;
+    const projectDir = resolveProjectDirectory(projectName);
+    const wasmPath = getWasmPath(projectDir, projectName);
+    const wasmDepsPath = getWasmDepsPath(projectDir, projectName);
 
     console.log(`Building contract in container: ${containerName}`);
     console.log(`Project name received: ${projectName || '(undefined - using default)'}`);
@@ -66,21 +67,32 @@ export async function buildContract(userId: string, projectName?: string) {
     );
     console.log('Build artifacts:', targetList);
 
-    // Now check for the specific WASM file
+    // Now check for the specific WASM file (name derived from the project)
     console.log('Looking for WASM at:', wasmPath);
 
+    let resolvedWasmPath = wasmPath;
     const { stdout: wasmCheck } = await execAsync(
       `docker exec ${containerName} ls -la ${wasmPath} 2>/dev/null || echo "WASM file not found"`
     );
     console.log('WASM check result:', wasmCheck);
 
     if (wasmCheck.includes('not found')) {
-      throw new Error(`WASM file not created. Build might have failed. Check: ${wasmPath}`);
+      // Fall back to whatever cargo actually produced in the release directory.
+      const { stdout: discovered } = await execAsync(
+        `docker exec ${containerName} find ${projectDir}/target/wasm32v1-none/release -maxdepth 1 -name "*.wasm" 2>/dev/null | head -1 || true`
+      );
+      const candidate = discovered.trim();
+      if (candidate) {
+        console.log('Discovered WASM at:', candidate);
+        resolvedWasmPath = candidate;
+      } else {
+        throw new Error(`WASM file not created. Build might have failed. Check: ${wasmPath}`);
+      }
     }
 
     // Read the WASM file as base64
     const { stdout: wasmBase64 } = await execAsync(
-      `docker exec ${containerName} cat ${wasmPath} | base64`,
+      `docker exec ${containerName} cat ${resolvedWasmPath} | base64`,
       { maxBuffer: 20 * 1024 * 1024 }
     );
 
@@ -114,8 +126,7 @@ export async function buildContract(userId: string, projectName?: string) {
 export async function compileContract(userId: string, projectName?: string) {
   try {
     const containerName = getContainerName(userId);
-    const workspacePath = getWorkspacePath();
-    const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
+    const projectDir = resolveProjectDirectory(projectName);
 
     console.log(`Compiling contract in container: ${containerName}, project: ${projectName || 'default'}`);
 
@@ -152,9 +163,8 @@ export async function compileContract(userId: string, projectName?: string) {
 export async function getContractBuildStatus(userId: string, projectName?: string) {
   try {
     const containerName = getContainerName(userId);
-    const workspacePath = getWorkspacePath();
-    const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
-    const wasmPath = `${projectDir}/target/wasm32v1-none/release/hello_world.wasm`;
+    const projectDir = resolveProjectDirectory(projectName);
+    const wasmPath = getWasmPath(projectDir, projectName);
 
     const { stdout: wasmCheck } = await execAsync(
       `docker exec ${containerName} test -f ${wasmPath} && echo "exists" || echo "missing"`
@@ -198,8 +208,7 @@ export async function getContractBuildStatus(userId: string, projectName?: strin
 export async function cleanBuild(userId: string, projectName?: string) {
   try {
     const containerName = getContainerName(userId);
-    const workspacePath = getWorkspacePath();
-    const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
+    const projectDir = resolveProjectDirectory(projectName);
 
     console.log(`Cleaning build artifacts in container: ${containerName}, project: ${projectName || 'default'}`);
 
