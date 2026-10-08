@@ -13,16 +13,7 @@ import type {
   LSPFunctionsRef,
 } from "./types";
 import { getLanguageFromFilename, getEditorOptions } from "./constants";
-import { registerInlayHintsProvider } from "./inlayHints";
-import { registerCompletionProvider } from "./completionProvider";
-import { registerHoverProvider } from "./hoverProvider";
-import { registerDefinitionProvider } from "./definitionProvider";
-import { registerReferenceProvider } from "./referenceProvider";
-import { registerRenameProvider } from "./renameProvider";
-import { registerFormatProvider } from "./formatProvider";
-import { registerCodeActionProvider } from "./codeActionProvider";
-import { registerDocumentSymbolProvider } from "./documentSymbolProvider";
-import { registerDocumentHighlightProvider } from "./documentHighlightProvider";
+import { PROVIDER_REGISTRATIONS } from "./providerCapabilities";
 import { useEditorZoom } from "./useEditorZoom";
 
 interface MonacoEditorProps {
@@ -93,17 +84,11 @@ export default function MonacoEditorWrapper({
         requestDocumentHighlight,
       };
 
-      // Register language providers (only once each)
-      registerInlayHintsProvider(monaco);
-      registerCompletionProvider(monaco);
-      registerHoverProvider(monaco);
-      registerDefinitionProvider(monaco);
-      registerReferenceProvider(monaco);
-      registerRenameProvider(monaco);
-      registerFormatProvider(monaco);
-      registerCodeActionProvider(monaco);
-      registerDocumentSymbolProvider(monaco);
-      registerDocumentHighlightProvider(monaco);
+      // Register language providers from the shared capability registry
+      // (only once each) so providers and LSP_CAPABILITIES stay in lockstep.
+      for (const { register } of PROVIDER_REGISTRATIONS) {
+        register(monaco);
+      }
 
       // Add wheel zoom handler
       if (containerRef.current) {
