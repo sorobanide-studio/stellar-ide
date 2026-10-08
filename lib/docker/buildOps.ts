@@ -11,6 +11,22 @@ import {
 } from './utils';
 
 /**
+ * Derive the WASM artifact file name from the project name.
+ *
+ * `stellar contract init <name>` creates a crate whose package name is the
+ * project name with every non-alphanumeric run collapsed to an underscore
+ * (Cargo package names are lower_snake_case), so the produced artifact is
+ * `${sanitized}.wasm` — never a hard-coded `hello_world.wasm`.
+ */
+function getWasmFileName(projectName?: string): string {
+  const base =
+    projectName && projectName.trim().length > 0
+      ? projectName.trim()
+      : 'soroban-hello-world';
+  return `${base.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase()}.wasm`;
+}
+
+/**
  * Build a Soroban contract
  * @param userId The user ID
  * @param projectName The project name
@@ -21,8 +37,9 @@ export async function buildContract(userId: string, projectName?: string) {
     const containerName = getContainerName(userId);
     const workspacePath = getWorkspacePath();
     const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
-    const wasmPath = `${projectDir}/target/wasm32v1-none/release/hello_world.wasm`;
-    const wasmDepsPath = `${projectDir}/target/wasm32v1-none/release/deps/hello_world.wasm`;
+    const wasmFileName = getWasmFileName(projectName);
+    const wasmPath = `${projectDir}/target/wasm32v1-none/release/${wasmFileName}`;
+    const wasmDepsPath = `${projectDir}/target/wasm32v1-none/release/deps/${wasmFileName}`;
 
     console.log(`Building contract in container: ${containerName}`);
     console.log(`Project name received: ${projectName || '(undefined - using default)'}`);
@@ -84,10 +101,13 @@ export async function buildContract(userId: string, projectName?: string) {
       { maxBuffer: 20 * 1024 * 1024 }
     );
 
+    const wasmBase64Trimmed = wasmBase64.trim();
+
     return {
       success: true,
-      wasmBase64: wasmBase64.trim(),
-      wasmSize: wasmBase64.length,
+      wasmBase64: wasmBase64Trimmed,
+      // Report the decoded byte length, not the length of the base64 string.
+      wasmSize: Buffer.from(wasmBase64Trimmed, 'base64').length,
       buildOutput: 'Build completed successfully',
     };
   } catch (error: any) {
@@ -154,7 +174,7 @@ export async function getContractBuildStatus(userId: string, projectName?: strin
     const containerName = getContainerName(userId);
     const workspacePath = getWorkspacePath();
     const projectDir = projectName ? `${workspacePath}/${projectName}` : `${workspacePath}/soroban-hello-world`;
-    const wasmPath = `${projectDir}/target/wasm32v1-none/release/hello_world.wasm`;
+    const wasmPath = `${projectDir}/target/wasm32v1-none/release/${getWasmFileName(projectName)}`;
 
     const { stdout: wasmCheck } = await execAsync(
       `docker exec ${containerName} test -f ${wasmPath} && echo "exists" || echo "missing"`
@@ -222,4 +242,3 @@ export async function cleanBuild(userId: string, projectName?: string) {
     };
   }
 }
-
