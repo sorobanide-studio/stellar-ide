@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Nightly full-history scan (03:17 UTC). A secret committed on a branch that
+    # never opened a pull request is only visible to a scheduled full scan.
+    - cron: "17 3 * * *"
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install root dependencies
+        run: npm ci
+      - name: Audit root dependencies (high and critical fail)
+        run: node .github/scripts/audit.mjs
+      - name: Install stellar-lsp-server dependencies
+        working-directory: stellar-lsp-server
+        run: npm ci
+      - name: Audit stellar-lsp-server dependencies (high and critical fail)
+        working-directory: stellar-lsp-server
+        run: node ../.github/scripts/audit.mjs
+
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan the full commit history for secrets
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            -w /repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose --exit-code=1
+
+  lsp:
+    name: lsp
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stellar-lsp-server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run type-check
+      - name: Build
+        run: npm run build
+
+  ci-success:
+    name: ci-success
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, build, test, audit, secret-scan, lsp]
+    if: always()
+    steps:
+      - name: Fail if any required job did not succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS"
+          bad=$(echo "$NEEDS" | jq -r 'to_entries[] | select(((.value.result == "success")) | not) | .key')
+          if [ -n "$bad" ]; then
+            echo "::error::These jobs did not succeed: $bad"
+            exit 1
+          fi
+          echo "All required jobs succeeded."
