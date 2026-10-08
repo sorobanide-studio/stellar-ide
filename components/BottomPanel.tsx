@@ -249,6 +249,8 @@ function TerminalContent({
   return (
     <div
       ref={terminalRef}
+      role="log"
+      aria-label="Console output"
       className="h-full overflow-y-auto bg-[#171717] font-mono text-sm p-4 space-y-1 sidebar-scrollbar"
     >
       {logs.length === 0 ? (

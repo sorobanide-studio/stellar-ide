@@ -112,7 +112,11 @@ export default function ProblemsPanel({
 
   if (diagnostics.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#171717]">
+      <div
+        role="status"
+        aria-label="Problems"
+        className="h-full flex items-center justify-center bg-[#171717]"
+      >
         <div className="text-center">
           <div className="text-gray-500 text-sm mb-2">No Problems</div>
           <div className="text-gray-600 text-xs">
@@ -124,12 +128,18 @@ export default function ProblemsPanel({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#171717] sidebar-scrollbar">
+    <div
+      role="region"
+      aria-label="Problems"
+      className="h-full overflow-y-auto bg-[#171717] sidebar-scrollbar"
+    >
       {groupedDiagnostics.map((group) => (
         <div key={group.severity} className="border-b border-[#252525]">
           {/* Group Header */}
           <div className="flex items-center gap-2 px-4 py-2 bg-[#1e1e1e] border-b border-[#252525] shrink-0">
-            <div className={group.color}>{group.icon}</div>
+            <div className={group.color} aria-hidden="true">
+              {group.icon}
+            </div>
             <span className="text-xs font-semibold text-gray-300">
               {group.label}
             </span>
@@ -139,21 +149,39 @@ export default function ProblemsPanel({
           </div>
 
           {/* Diagnostic Items */}
-          <div>
+          <div
+            role="list"
+            aria-label={`${group.label} (${group.items.length})`}
+          >
             {group.items.map((diagnostic) => {
               const line = diagnostic.range.start.line + 1;
               const column = diagnostic.range.start.character + 1;
               const filePath = formatFilePath(diagnostic.uri);
+              // Severity is exposed as text so it is not conveyed by colour
+              // alone (WCAG 1.4.1 Use of Color).
+              const severityLabel = group.label.replace(/s$/, "");
 
               return (
                 <div
                   key={diagnostic.id}
-                  className="flex items-start gap-3 px-4 py-2 hover:bg-[#252525] cursor-pointer group border-b border-[#252525]/50 transition-colors"
+                  role="listitem"
+                  tabIndex={0}
+                  aria-label={`${severityLabel}: ${diagnostic.message} — ${filePath} line ${line}, column ${column}`}
+                  className="flex items-start gap-3 px-4 py-2 hover:bg-[#252525] focus:bg-[#252525] focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-400 cursor-pointer group border-b border-[#252525]/50 transition-colors"
                   onClick={() =>
                     handleDiagnosticClick(diagnostic, line, column)
                   }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleDiagnosticClick(diagnostic, line, column);
+                    }
+                  }}
                 >
-                  <div className={`mt-0.5 shrink-0 ${group.color}`}>
+                  <div
+                    className={`mt-0.5 shrink-0 ${group.color}`}
+                    aria-hidden="true"
+                  >
                     {group.icon}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -166,6 +194,7 @@ export default function ProblemsPanel({
                       </span>
                     </div>
                     <div className="text-sm text-gray-300 group-hover:text-white transition-colors">
+                      <span className="sr-only">{severityLabel}: </span>
                       {diagnostic.message}
                     </div>
                   </div>
