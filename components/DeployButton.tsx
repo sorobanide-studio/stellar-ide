@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { deployWithWallet } from "@/lib/wallet-deploy";
 import { useWallet } from "@/context/WalletContext";
+import { sanitizeAnnouncement } from "../lib/a11y";
 
 interface DeployButtonProps {
   onLog: (message: string, type: "log" | "error" | "warn" | "info") => void;
@@ -11,11 +12,13 @@ interface DeployButtonProps {
 
 export function DeployButton({ onLog, projectName }: DeployButtonProps) {
   const [isDeploying, setIsDeploying] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   const wallet = useWallet();
 
   const handleDeploy = async () => {
     if (!wallet.walletAddress) {
       onLog(" Wallet address not found", "error");
+      setAnnouncement("Deployment failed. No wallet address found.");
       return;
     }
 
@@ -29,11 +32,13 @@ export function DeployButton({ onLog, projectName }: DeployButtonProps) {
 
       if (!wallet.isConnected) {
         onLog(" Wallet connection required", "error");
+        setAnnouncement("Deployment failed. A wallet connection is required.");
         return;
       }
     }
 
     setIsDeploying(true);
+    setAnnouncement(`Deploying contract ${projectName || "default"}.`);
     onLog("", "log");
     onLog("", "info");
     onLog("DEPLOYING CONTRACT", "info");
@@ -63,6 +68,11 @@ export function DeployButton({ onLog, projectName }: DeployButtonProps) {
         onLog(" DEPLOYMENT SUCCESSFUL", "log");
         onLog("", "log");
         onLog(` Contract ID: ${result.contractId}`, "log");
+        setAnnouncement(
+          sanitizeAnnouncement(
+            `Deployment succeeded. Contract ID ${result.contractId}.`
+          )
+        );
         onLog("", "log");
         // Show success message
         alert(` Contract deployed!\nContract ID: ${result.contractId}`);
@@ -72,6 +82,11 @@ export function DeployButton({ onLog, projectName }: DeployButtonProps) {
         onLog(" DEPLOYMENT FAILED", "error");
         onLog("", "error");
         onLog(`${result.error}`, "error");
+        setAnnouncement(
+          sanitizeAnnouncement(
+            `Deployment failed: ${result.error ?? "unknown error"}`
+          )
+        );
         onLog("", "log");
       }
     } catch (error) {
@@ -83,17 +98,33 @@ export function DeployButton({ onLog, projectName }: DeployButtonProps) {
       onLog("", "error");
       onLog(`${errorMessage}`, "error");
       onLog("", "log");
+      setAnnouncement(
+        sanitizeAnnouncement(`Deployment failed: ${errorMessage}`)
+      );
     } finally {
       setIsDeploying(false);
     }
   };
 
   return (
-    <button
-      onClick={handleDeploy}
-      disabled={isDeploying || !wallet.walletAddress}
-      className="text-xs px-3 py-1 rounded dark:bg-black hover:bg-[#171717] disabled:bg-gray-800 text-white disabled:opacity-50 transition-colors"
-    >
+    <>
+      <span
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </span>
+      <button
+        onClick={handleDeploy}
+        disabled={isDeploying || !wallet.walletAddress}
+        aria-busy={isDeploying}
+        aria-label={
+          isDeploying ? "Deploying contract, please wait" : "Deploy contract"
+        }
+        className="text-xs px-3 py-1 rounded dark:bg-black hover:bg-[#171717] disabled:bg-gray-800 text-white disabled:opacity-50 transition-colors"
+      >
       {isDeploying ? (
         <span className="flex items-center">
           <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
@@ -104,6 +135,7 @@ export function DeployButton({ onLog, projectName }: DeployButtonProps) {
       ) : (
         "Deploy"
       )}
-    </button>
+      </button>
+    </>
   );
 }
