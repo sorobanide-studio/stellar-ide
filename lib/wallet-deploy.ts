@@ -35,6 +35,47 @@ export function generateDeploymentSalt(): Buffer {
   return Buffer.from(bytes);
 }
 
+/**
+ * Decode a contract id out of a `createCustomContract` transaction's
+ * `returnValue` (an `ScVal`). Returns the literal string `"unknown"` when the
+ * value cannot be decoded into an address, so a malformed return value can
+ * never masquerade as a successful deployment.
+ *
+ * Exported for testability.
+ */
+export function parseContractIdFromReturnValue(returnValue: unknown): string {
+  if (!returnValue) {
+    return "unknown";
+  }
+
+  const scVal = returnValue as {
+    address?: () => unknown;
+    toString?: () => string;
+  };
+
+  if (typeof scVal.address === "function") {
+    try {
+      return StellarSdk.Address.fromScAddress(
+        scVal.address() as Parameters<
+          typeof StellarSdk.Address.fromScAddress
+        >[0]
+      ).toString();
+    } catch {
+      return "unknown";
+    }
+  }
+
+  if (typeof scVal.toString === "function") {
+    const asString = scVal.toString();
+    // A default Object#toString() ("[object Object]") is not a contract id.
+    if (asString && asString !== "[object Object]") {
+      return asString;
+    }
+  }
+
+  return "unknown";
+}
+
 export async function deployWithWallet(
   walletAddress: string,
   logToTerminal: (msg: string, type: string) => void,
@@ -234,22 +275,15 @@ export async function deployWithWallet(
       try {
         finalTxInfo = await server.getTransaction(createResult.hash);
         if (finalTxInfo.status === "SUCCESS") {
-          // Extract contract ID from transaction result
-          const contractIdScVal = finalTxInfo.returnValue;
-          
-          // Convert ScVal address to string
-          let contractIdStr = "unknown";
-          if (contractIdScVal) {
-            try {
-              // Try to convert Address ScVal to string
-              if (typeof contractIdScVal.address === 'function') {
-                contractIdStr = StellarSdk.Address.fromScAddress(contractIdScVal.address()).toString();
-              } else if (contractIdScVal.toString) {
-                contractIdStr = contractIdScVal.toString();
-              }
-            } catch (e) {
-              logToTerminal(`Warning: Could not parse contract ID: ${e}`, "warn");
-            }
+          // Extract contract ID from transaction result (ScVal -> StrKey).
+          const contractIdStr = parseContractIdFromReturnValue(
+            finalTxInfo.returnValue
+          );
+          if (contractIdStr === "unknown") {
+            logToTerminal(
+              "Warning: Could not parse contract ID from transaction return value",
+              "warn"
+            );
           }
           
           logToTerminal("", "log");
