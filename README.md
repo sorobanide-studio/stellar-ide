@@ -37,7 +37,7 @@ The screenshot above shows the main editor interface with the code editor, file 
 
 ### Prerequisites
 
-- Node.js 18.x or higher
+- **Node.js 20.9 or higher** - Next.js 16 requires Node ≥ 20.9 and React 19 has dropped Node 18; 22 LTS is recommended. Check with `node --version`, or run `nvm use` to adopt the version pinned in [`.nvmrc`](./.nvmrc).
 - npm or yarn package manager
 - Docker (for container-based development)
 
