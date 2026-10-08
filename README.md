@@ -46,8 +46,11 @@ The screenshot above shows the main editor interface with the code editor, file 
 1. **Clone the repository**
 
    ```bash
-   cd code-editor
+   git clone https://github.com/sorobanide-studio/stellar-ide.git
+   cd stellar-ide
    ```
+
+   The clone creates a `stellar-ide` directory; if you cloned into a different folder name, `cd` into that instead.
 
 2. **Install dependencies**
 
