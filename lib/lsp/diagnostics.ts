@@ -6,9 +6,18 @@
 import { Diagnostic, MonacoMarker, WindowWithMonaco, MonacoModel } from './types';
 
 /**
- * Convert LSP diagnostics to Monaco markers
  * LSP severity: 1=Error, 2=Warning, 3=Info, 4=Hint
  * Monaco severity: 8=Error, 4=Warning, 2=Info, 1=Hint
+ */
+const MONACO_SEVERITY: Record<number, number> = {
+  1: 8,
+  2: 4,
+  3: 2,
+  4: 1,
+};
+
+/**
+ * Convert LSP diagnostics to Monaco markers
  */
 export function convertToMonacoMarkers(diagnostics: Diagnostic[]): MonacoMarker[] {
   return diagnostics.map((diag) => ({
@@ -17,7 +26,7 @@ export function convertToMonacoMarkers(diagnostics: Diagnostic[]): MonacoMarker[
     endLineNumber: diag.range.end.line + 1,
     endColumn: diag.range.end.character + 1,
     message: diag.message,
-    severity: diag.severity === 1 ? 8 : diag.severity === 2 ? 4 : 2,
+    severity: MONACO_SEVERITY[diag.severity] ?? 2,
   }));
 }
 
@@ -31,24 +40,30 @@ export function findMatchingModel(
 ): MonacoModel | null {
   const diagnosticFilename = uri.split('/').pop() || '';
 
+  // Strategy 1: Exact match (checked across every model first, so two files
+  // that share a filename can never resolve to each other's model).
   for (const model of models) {
     const modelUri = model.uri?.toString() || '';
-
-    // Strategy 1: Exact match
     if (modelUri === uri) {
       console.log('[LSP Diagnostics] ✓ Exact URI match');
       return model;
     }
+  }
 
-    // Strategy 2: Both URIs contain same filename
+  // Strategy 2: Both URIs contain same filename
+  for (const model of models) {
+    const modelUri = model.uri?.toString() || '';
     const modelFilename = modelUri.split('/').pop() || '';
     if (modelFilename === diagnosticFilename && diagnosticFilename.endsWith('.rs')) {
       console.log('[LSP Diagnostics] ✓ Filename match:', diagnosticFilename);
       return model;
     }
+  }
 
-    // Strategy 3: Path contains the other
-    const uriPath = uri.replace('file://', '');
+  // Strategy 3: Path contains the other
+  const uriPath = uri.replace('file://', '');
+  for (const model of models) {
+    const modelUri = model.uri?.toString() || '';
     if (modelUri.includes(uriPath) || uriPath.includes(modelUri.replace('file://', ''))) {
       console.log('[LSP Diagnostics] ✓ Path contains match');
       return model;
