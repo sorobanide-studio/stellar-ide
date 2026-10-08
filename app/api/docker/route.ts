@@ -26,8 +26,10 @@ export async function POST(request: Request) {
 try {
 const { action, walletAddress, filePath, content, publicKey, projectName, description, oldName, newName } = await request.json();
 
-// Validate wallet address is provided
-if (!walletAddress && action !== 'checkHealth') {
+// A wallet address is required for every action, including checkHealth:
+// getContainerName validates it and would otherwise throw inside the handler
+// and be turned into a 500 (with `details`) instead of a 400.
+if (!walletAddress) {
   return NextResponse.json(
     { error: 'Wallet address is required' },
     { status: 400 }

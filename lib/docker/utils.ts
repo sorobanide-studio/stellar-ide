@@ -32,8 +32,23 @@ export function escapeFilePath(path: string): string {
  * Get container name from wallet address (public key)
  * @param walletAddress The Stellar wallet public key
  * @returns Formatted container name
+ * @throws Error when the address is missing or not a 56-character G-address
  */
 export function getContainerName(walletAddress: string): string {
+  // Reject a missing or malformed address explicitly. Previously a missing
+  // address threw `TypeError: Cannot read properties of undefined (reading
+  // 'slice')` from deep inside this call and surfaced as a 500.
+  if (typeof walletAddress !== 'string' || walletAddress.trim() === '') {
+    throw new Error(
+      'Invalid wallet address: a Stellar wallet public key is required'
+    );
+  }
+  if (walletAddress.length !== 56 || !walletAddress.startsWith('G')) {
+    throw new Error(
+      'Invalid wallet address: expected a 56-character Stellar public key starting with G'
+    );
+  }
+
   // Use first 10 characters of wallet address and convert to lowercase
   // Format: soroban-GBUQWP3K... -> soroban-gbuqwp3k
   const prefix = walletAddress.slice(0, 10).toLowerCase();
