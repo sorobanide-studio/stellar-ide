@@ -35,6 +35,80 @@ export function generateDeploymentSalt(): Buffer {
   return Buffer.from(bytes);
 }
 
+/**
+ * The transaction info a polling loop cares about. `@stellar/stellar-sdk`'s
+ * `rpc.Server` satisfies `TransactionStatusSource` structurally.
+ */
+export interface TransactionResult {
+  status: string;
+  resultXdr?: any;
+  returnValue?: any;
+}
+
+/**
+ * The subset of the Soroban RPC client the polling helper needs.
+ */
+export interface TransactionStatusSource {
+  getTransaction(hash: string): Promise<TransactionResult>;
+}
+
+/**
+ * Poll a Soroban RPC server until a transaction reaches a terminal status.
+ *
+ * - `SUCCESS` resolves with the transaction info.
+ * - `FAILED` throws immediately with the `resultXdr` — a terminal failure must
+ *   never be re-polled.
+ * - `NOT_FOUND` (or a rejected `getTransaction`) means the ledger has not
+ *   included the transaction yet, so polling continues until `maxAttempts`.
+ *
+ * Previously a `FAILED` status was thrown from inside a `try` whose `catch`
+ * swallowed it, so the loop kept polling until timeout and reported a generic
+ * "timeout" instead of the real failure.
+ *
+ * Exported for testability.
+ */
+export async function waitForTerminalTransaction(
+  server: TransactionStatusSource,
+  hash: string,
+  options: {
+    maxAttempts?: number;
+    intervalMs?: number;
+    failLabel?: string;
+    timeoutMessage?: string;
+    onProgress?: (attempt: number) => void;
+  } = {}
+): Promise<TransactionResult> {
+  const maxAttempts = options.maxAttempts ?? 60;
+  const intervalMs = options.intervalMs ?? 1000;
+  const failLabel = options.failLabel ?? "Transaction";
+  const timeoutMessage = options.timeoutMessage ?? "Transaction timeout";
+
+  let info: TransactionResult | undefined;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      info = await server.getTransaction(hash);
+    } catch {
+      // `getTransaction` rejects (e.g. NOT_FOUND) while the transaction is not
+      // yet available — continue polling.
+      info = undefined;
+    }
+
+    if (info?.status === "SUCCESS") {
+      return info;
+    }
+    if (info?.status === "FAILED") {
+      // Terminal failure: stop polling now and surface the resultXdr.
+      throw new Error(`${failLabel} failed: ${info.resultXdr}`);
+    }
+
+    // NOT_FOUND / any other non-terminal status: keep waiting.
+    options.onProgress?.(attempt + 1);
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error(timeoutMessage);
+}
+
 export async function deployWithWallet(
   walletAddress: string,
   logToTerminal: (msg: string, type: string) => void,
@@ -139,30 +213,18 @@ export async function deployWithWallet(
     );
 
     // 4. Wait for upload confirmation
-    let uploadTxInfo;
-    let attempts = 0;
     logToTerminal(" Waiting for upload confirmation...", "info");
-    
-    while (attempts < 60) {
-      try {
-        uploadTxInfo = await server.getTransaction(uploadResult.hash);
-        if (uploadTxInfo.status === "SUCCESS") break;
-        if (uploadTxInfo.status === "FAILED") {
-          throw new Error(`Upload failed: ${uploadTxInfo.resultXdr}`);
-        }
-      } catch (error) {
-        // Transaction not yet available, continue waiting
-      }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      attempts++;
-      if (attempts % 10 === 0)
-        logToTerminal(`   Waiting... (${attempts}s)`, "log");
-    }
-
-    if (!uploadTxInfo || uploadTxInfo.status !== "SUCCESS") {
-      throw new Error("WASM upload timeout");
-    }
+    // A FAILED status now propagates immediately (with its resultXdr) instead
+    // of being swallowed by the polling loop.
+    const uploadTxInfo = await waitForTerminalTransaction(server, uploadResult.hash, {
+      failLabel: "Upload",
+      timeoutMessage: "WASM upload timeout",
+      onProgress: (attempt) => {
+        if (attempt % 10 === 0)
+          logToTerminal(`   Waiting... (${attempt}s)`, "log");
+      },
+    });
 
     // Extract the WASM hash from the return value
     const wasmHash = uploadTxInfo.returnValue;
@@ -226,70 +288,58 @@ export async function deployWithWallet(
     );
 
     // 6. Wait for final confirmation
-    attempts = 0;
-    let finalTxInfo;
     logToTerminal(" Waiting for deploy confirmation...", "info");
-    
-    while (attempts < 60) {
-      try {
-        finalTxInfo = await server.getTransaction(createResult.hash);
-        if (finalTxInfo.status === "SUCCESS") {
-          // Extract contract ID from transaction result
-          const contractIdScVal = finalTxInfo.returnValue;
-          
-          // Convert ScVal address to string
-          let contractIdStr = "unknown";
-          if (contractIdScVal) {
-            try {
-              // Try to convert Address ScVal to string
-              if (typeof contractIdScVal.address === 'function') {
-                contractIdStr = StellarSdk.Address.fromScAddress(contractIdScVal.address()).toString();
-              } else if (contractIdScVal.toString) {
-                contractIdStr = contractIdScVal.toString();
-              }
-            } catch (e) {
-              logToTerminal(`Warning: Could not parse contract ID: ${e}`, "warn");
-            }
-          }
-          
-          logToTerminal("", "log");
-          logToTerminal(" Contract Deployed Successfully!", "log");
-          logToTerminal("", "log");
-          logToTerminal(` Contract ID:`, "info");
-          logToTerminal(`   ${contractIdStr}`, "log");
-          logToTerminal("", "log");
-          logToTerminal(` Explorer Links:`, "info");
-          logToTerminal(
-            `   → https://stellar.expert/explorer/testnet/contract/${contractIdStr}`,
-            "info"
-          );
-          logToTerminal(
-            `   → https://lab.stellar.org/r/testnet/contract/${contractIdStr}`,
-            "info"
-          );
-          
-          return {
-            success: true,
-            contractId: contractIdStr,
-            transactionHash: createResult.hash,
-          };
-        }
-        if (finalTxInfo.status === "FAILED") {
-          throw new Error(
-            `Contract creation failed: ${finalTxInfo.resultXdr}`
-          );
-        }
-      } catch (error) {
-        // Transaction not yet available, continue waiting
-      }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      attempts++;
-      if (attempts % 10 === 0)
-        logToTerminal(`   Waiting for confirmation... (${attempts}s)`, "log");
+    // A FAILED status now propagates immediately (with its resultXdr) instead
+    // of being swallowed by the polling loop.
+    const finalTxInfo = await waitForTerminalTransaction(server, createResult.hash, {
+      failLabel: "Contract creation",
+      timeoutMessage: "Contract creation timeout",
+      onProgress: (attempt) => {
+        if (attempt % 10 === 0)
+          logToTerminal(`   Waiting for confirmation... (${attempt}s)`, "log");
+      },
+    });
+
+    // Extract contract ID from transaction result
+    const contractIdScVal = finalTxInfo.returnValue;
+
+    // Convert ScVal address to string
+    let contractIdStr = "unknown";
+    if (contractIdScVal) {
+      try {
+        // Try to convert Address ScVal to string
+        if (typeof contractIdScVal.address === 'function') {
+          contractIdStr = StellarSdk.Address.fromScAddress(contractIdScVal.address()).toString();
+        } else if (contractIdScVal.toString) {
+          contractIdStr = contractIdScVal.toString();
+        }
+      } catch (e) {
+        logToTerminal(`Warning: Could not parse contract ID: ${e}`, "warn");
+      }
     }
 
-    throw new Error("Contract creation timeout");
+    logToTerminal("", "log");
+    logToTerminal(" Contract Deployed Successfully!", "log");
+    logToTerminal("", "log");
+    logToTerminal(` Contract ID:`, "info");
+    logToTerminal(`   ${contractIdStr}`, "log");
+    logToTerminal("", "log");
+    logToTerminal(` Explorer Links:`, "info");
+    logToTerminal(
+      `   → https://stellar.expert/explorer/testnet/contract/${contractIdStr}`,
+      "info"
+    );
+    logToTerminal(
+      `   → https://lab.stellar.org/r/testnet/contract/${contractIdStr}`,
+      "info"
+    );
+
+    return {
+      success: true,
+      contractId: contractIdStr,
+      transactionHash: createResult.hash,
+    };
   } catch (err: any) {
     logToTerminal("", "log");
     logToTerminal(` ${err.message}`, "error");

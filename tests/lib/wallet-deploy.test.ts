@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { generateDeploymentSalt } from "@/lib/wallet-deploy";
+import { describe, expect, it, vi } from "vitest";
+import {
+  generateDeploymentSalt,
+  waitForTerminalTransaction,
+} from "@/lib/wallet-deploy";
 
 describe("generateDeploymentSalt", () => {
   it("returns a 32-byte Buffer (no timestamp prefix, no Math.random)", () => {
@@ -52,5 +55,70 @@ describe("generateDeploymentSalt", () => {
     expect("non-alphanumeric byte appeared in at least one of 32 salts").toBe(
       "non-alphanumeric byte appeared in at least one of 32 salts",
     );
+  });
+});
+
+
+describe("waitForTerminalTransaction", () => {
+  const server = (getTransaction: ReturnType<typeof vi.fn>) => ({ getTransaction });
+
+  it("stops polling on the first FAILED and surfaces the resultXdr", async () => {
+    const getTransaction = vi
+      .fn()
+      .mockResolvedValue({ status: "FAILED", resultXdr: "AAAA_FAILED_RESULT_XDR" });
+
+    await expect(
+      waitForTerminalTransaction(server(getTransaction), "hash", {
+        intervalMs: 0,
+        failLabel: "Upload",
+      }),
+    ).rejects.toThrow("AAAA_FAILED_RESULT_XDR");
+
+    // A terminal failure must be observed exactly once — never re-polled.
+    expect(getTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps polling while the transaction is NOT_FOUND and resolves on SUCCESS", async () => {
+    const getTransaction = vi
+      .fn()
+      .mockResolvedValueOnce({ status: "NOT_FOUND" })
+      .mockResolvedValueOnce({ status: "NOT_FOUND" })
+      .mockResolvedValueOnce({ status: "SUCCESS", returnValue: "wasm-hash" });
+
+    const result = await waitForTerminalTransaction(server(getTransaction), "hash", {
+      intervalMs: 0,
+    });
+
+    expect(result.status).toBe("SUCCESS");
+    expect(result.returnValue).toBe("wasm-hash");
+    expect(getTransaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps polling when getTransaction rejects (transaction not yet available)", async () => {
+    const getTransaction = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("NOT_FOUND"))
+      .mockResolvedValueOnce({ status: "SUCCESS" });
+
+    const result = await waitForTerminalTransaction(server(getTransaction), "hash", {
+      intervalMs: 0,
+    });
+
+    expect(result.status).toBe("SUCCESS");
+    expect(getTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws the timeout message when no terminal status is reached", async () => {
+    const getTransaction = vi.fn().mockResolvedValue({ status: "NOT_FOUND" });
+
+    await expect(
+      waitForTerminalTransaction(server(getTransaction), "hash", {
+        maxAttempts: 3,
+        intervalMs: 0,
+        timeoutMessage: "WASM upload timeout",
+      }),
+    ).rejects.toThrow("WASM upload timeout");
+
+    expect(getTransaction).toHaveBeenCalledTimes(3);
   });
 });
