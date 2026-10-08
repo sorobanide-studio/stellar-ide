@@ -896,6 +896,25 @@ Pull requests must pass all continuous integration checks. You can run the exact
    npm test --if-present
    ```
 
+### Required Checks and Review Policy
+
+Every pull request must pass the aggregate **`ci-success`** check, the single required
+status check configured in branch protection. It only goes green when every job it
+depends on (`lint`, `type-check`, `build` and `test`) succeeded, so a skipped or
+cancelled job cannot be mistaken for a passing one.
+
+Review is also required on the paths where a mistake has security or cost
+consequences. [`.github/CODEOWNERS`](.github/CODEOWNERS) assigns them to the
+maintainer group, so GitHub requests that reviewer automatically:
+
+- `/.github/` — the workflows, which run with the repository token.
+- `Dockerfile` — the sandbox image every user's container is built from.
+- `/app/api/**` — the routes that dispatch Docker actions.
+- `/lib/docker/**` — the code that builds and runs Docker commands.
+
+A pull request that touches only `Dockerfile` therefore requests the designated
+reviewer before it can be merged.
+
 ---
 
 **Happy Coding! **

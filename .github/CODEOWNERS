@@ -1,0 +1,19 @@
+# Reviewers for this repository.
+#
+# GitHub requests a review from the matching owner on every pull request, so the
+# paths below cannot be merged without a maintainer's review. Keep the group in
+# sync with the branch-protection settings described in the README
+# ("Required Checks and Review Policy").
+
+# Default owner for everything not matched below.
+*                       @sorobanide-studio/maintainers
+
+# Everything that runs with the workflow token, including this file.
+/.github/               @sorobanide-studio/maintainers
+
+# The sandbox image: a mistake here changes every user's container.
+/Dockerfile             @sorobanide-studio/maintainers
+
+# The Docker API routes and the code that builds shell commands.
+/app/api/**             @sorobanide-studio/maintainers
+/lib/docker/**          @sorobanide-studio/maintainers
