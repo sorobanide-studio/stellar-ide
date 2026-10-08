@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Nightly at 03:17 UTC. This is deliberately off the top of the hour: the
+    # GitHub scheduler is busiest at :00 and delays runs scheduled there. The
+    # jobs below are the same ones the pull-request run uses, so the nightly
+    # detects external drift (a yanked release, a new SDK, a rustup rename)
+    # without a second set of steps to keep in sync.
+    - cron: "17 3 * * *"
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+
+  docker-image:
+    name: docker-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build stellar-sandbox
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: stellar-sandbox:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Print the resolved toolchain versions
+        run: docker run --rm stellar-sandbox:ci sh -c 'rustc --version && stellar --version && rust-analyzer --version'
+
+  nightly-report:
+    name: nightly-report
+    runs-on: ubuntu-latest
+    # Only the upstream repository on a scheduled run reports: a fork that enables
+    # Actions must not open issues against itself, and pull requests already show
+    # their own failures.
+    if: ${{ always() && github.event_name == 'schedule' && github.repository == 'sorobanide-studio/stellar-ide' }}
+    needs: [lint, type-check, build, test, docker-image]
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update the single nightly tracking issue
+        uses: actions/github-script@v7
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const label = "nightly";
+            const needs = JSON.parse(process.env.NEEDS);
+            const failed = Object.entries(needs)
+              .filter(([, job]) => job.result !== "success")
+              .map(([name, job]) => `- \`${name}\`: ${job.result}`);
+
+            if (failed.length === 0) {
+              core.info("Nightly run is green; nothing to track.");
+              return;
+            }
+
+            const body = [
+              "The scheduled nightly build failed.",
+              "",
+              ...failed,
+              "",
+              `Run: ${process.env.RUN_URL}`,
+            ].join("\n");
+
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: label,
+            });
+
+            if (open.data.length > 0) {
+              const issue = open.data[0];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body,
+              });
+              core.info(`Updated the existing nightly tracking issue #${issue.number}.`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: "[nightly] scheduled build failure",
+                body,
+                labels: [label],
+              });
+              core.info(`Opened nightly tracking issue #${created.data.number}.`);
+            }
+
+  ci-success:
+    name: ci-success
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, build, test, docker-image]
+    if: always()
+    steps:
+      - name: Fail if any required job did not succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS"
+          bad=$(echo "$NEEDS" | jq -r 'to_entries[] | select(((.value.result == "success")) | not) | .key')
+          if [ -n "$bad" ]; then
+            echo "::error::These jobs did not succeed: $bad"
+            exit 1
+          fi
+          echo "All required jobs succeeded."
