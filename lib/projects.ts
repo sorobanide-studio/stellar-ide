@@ -3,7 +3,35 @@
  * Each folder in /workspace is a project initialized with `stellar contract init`
  */
 
-import { execAsync, getWorkspacePath, getContainerName } from './docker/utils';
+import {
+  execAsync,
+  getWorkspacePath,
+  getContainerName,
+  escapeShellArg,
+} from './docker/utils';
+
+/**
+ * Allowed shape for a project name: 1-64 characters, starting with an
+ * alphanumeric, then alphanumerics, dots, underscores or hyphens. '..' is
+ * explicitly rejected so the name can never traverse out of the workspace,
+ * and a leading dot is impossible because the first character must be
+ * alphanumeric (getAllProjects hides dotfolders anyway).
+ */
+const PROJECT_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/**
+ * Returns true when `name` is a safe project folder name. Exported so callers
+ * and tests can reuse the exact same rule the project commands enforce.
+ */
+export function isValidProjectName(name: unknown): name is string {
+  return (
+    typeof name === 'string' &&
+    PROJECT_NAME_PATTERN.test(name) &&
+    !name.includes('..')
+  );
+}
+
+const INVALID_PROJECT_NAME = 'Invalid project name';
 
 export interface Project {
   id: string;
@@ -56,6 +84,11 @@ export async function createProject(
   description?: string
 ): Promise<{ success: boolean; project?: Project; error?: string }> {
   try {
+    // Validate before anything is executed or read.
+    if (!isValidProjectName(projectName)) {
+      return { success: false, error: INVALID_PROJECT_NAME };
+    }
+
     const containerName = getContainerName(walletAddress);
     const projectPath = getWorkspacePath();
     const projects = await getAllProjects(walletAddress);
@@ -66,7 +99,7 @@ export async function createProject(
     }
 
     // Initialize Soroban contract using stellar command
-    const cmd = `docker exec -u developer ${containerName} sh -c "cd ${projectPath} && stellar contract init ${projectName}"`;
+    const cmd = `docker exec -u developer ${containerName} sh -c "cd ${escapeShellArg(projectPath)} && stellar contract init ${escapeShellArg(projectName)}"`;
     const result = await execAsync(cmd);
     
     console.log('Project initialization output:', result.stdout);
@@ -94,11 +127,17 @@ export async function deleteProject(
   projectName: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!isValidProjectName(projectName)) {
+      return { success: false, error: INVALID_PROJECT_NAME };
+    }
+
     const containerName = getContainerName(walletAddress);
     const projectPath = getWorkspacePath();
 
-    // Delete project folder
-    await execAsync(`docker exec -u developer ${containerName} rm -rf "${projectPath}/${projectName}"`);
+    // Delete project folder (path is shell-escaped, name is already validated)
+    await execAsync(
+      `docker exec -u developer ${containerName} rm -rf ${escapeShellArg(`${projectPath}/${projectName}`)}`
+    );
 
     return { success: true };
   } catch (error: any) {
@@ -115,6 +154,10 @@ export async function getProject(
   projectName: string
 ): Promise<{ success: boolean; project?: Project; error?: string }> {
   try {
+    if (!isValidProjectName(projectName)) {
+      return { success: false, error: INVALID_PROJECT_NAME };
+    }
+
     const projects = await getAllProjects(walletAddress);
     const project = projects.find(p => p.name === projectName);
 
@@ -137,6 +180,10 @@ export async function renameProject(
   newName: string
 ): Promise<{ success: boolean; project?: Project; error?: string }> {
   try {
+    if (!isValidProjectName(oldName) || !isValidProjectName(newName)) {
+      return { success: false, error: INVALID_PROJECT_NAME };
+    }
+
     const containerName = getContainerName(walletAddress);
     const projectPath = getWorkspacePath();
     const projects = await getAllProjects(walletAddress);
@@ -151,7 +198,9 @@ export async function renameProject(
     }
 
     // Rename folder
-    await execAsync(`docker exec -u developer ${containerName} mv "${projectPath}/${oldName}" "${projectPath}/${newName}"`);
+    await execAsync(
+      `docker exec -u developer ${containerName} mv ${escapeShellArg(`${projectPath}/${oldName}`)} ${escapeShellArg(`${projectPath}/${newName}`)}`
+    );
 
     const renamedProject: Project = {
       ...project,
