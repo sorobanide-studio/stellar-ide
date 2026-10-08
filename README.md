@@ -383,31 +383,62 @@ Located on the left side of the editor panel:
 
 ## Keyboard Shortcuts
 
-### Global Shortcuts
+The table below splits bindings into **app-level** (registered in
+[`hooks/useKeyboardShortcuts.ts`](hooks/useKeyboardShortcuts.ts)) and
+**editor-level** (Monaco defaults that [`components/Editor/constants.ts`](components/Editor/constants.ts)'s
+`getEditorOptions` does not disable). Rows that no code implements have been
+removed; the previous table listed `Open File`, `New File`, `Close Tab`,
+`Next Tab`, `Previous Tab`, and `Duplicate Line` — none of those are registered
+in `useKeyboardShortcuts.ts` or surfaced through the editor options.
 
-| Action         | Windows/Linux      | macOS             |
-| -------------- | ------------------ | ----------------- |
-| Save File      | Ctrl + S           | Cmd + S           |
-| Open File      | Ctrl + O           | Cmd + O           |
-| New File       | Ctrl + N           | Cmd + N           |
-| Close Tab      | Ctrl + W           | Cmd + W           |
-| Next Tab       | Ctrl + Tab         | Cmd + Tab         |
-| Previous Tab   | Ctrl + Shift + Tab | Cmd + Shift + Tab |
-| Find           | Ctrl + F           | Cmd + F           |
-| Find & Replace | Ctrl + H           | Cmd + H           |
+### App-level shortcuts (registered in `hooks/useKeyboardShortcuts.ts`)
 
-### Editor Shortcuts
+| Action           | Windows/Linux | macOS  | Source                                            |
+| ---------------- | ------------- | ------ | ------------------------------------------------- |
+| Save File        | Ctrl + S      | Cmd + S | `useKeyboardShortcuts.ts` → `if ((e.metaKey \|\| e.ctrlKey) && e.key === "s")` |
+| Toggle Terminal  | Ctrl + J      | Cmd + J | `useKeyboardShortcuts.ts` → `if ((e.metaKey \|\| e.ctrlKey) && e.key === "j")` |
+| Zoom In          | Ctrl + =      | Cmd + = | `useKeyboardShortcuts.ts` (also `Ctrl + Shift + I`) |
+| Zoom Out         | Ctrl + -      | Cmd + - | `useKeyboardShortcuts.ts` (also `Ctrl + Shift + -`) |
+| Reset Zoom       | Ctrl + 0      | Cmd + 0 | `useKeyboardShortcuts.ts`                          |
 
-| Action         | Shortcut         |
-| -------------- | ---------------- |
-| Format Code    | Ctrl + Shift + F |
-| Comment Line   | Ctrl + /         |
-| Undo           | Ctrl + Z         |
-| Redo           | Ctrl + Y         |
-| Copy Line      | Ctrl + C         |
-| Paste          | Ctrl + V         |
-| Delete Line    | Ctrl + Shift + K |
-| Duplicate Line | Ctrl + Shift + D |
+### Editor-level shortcuts (Monaco defaults, not disabled in `getEditorOptions`)
+
+| Action         | Windows/Linux        | macOS               |
+| -------------- | -------------------- | ------------------- |
+| Find           | Ctrl + F             | Cmd + F             |
+| Find & Replace | Ctrl + H             | Cmd + H             |
+| Format Code    | Ctrl + Shift + F     | Cmd + Shift + F     |
+| Comment Line   | Ctrl + /             | Cmd + /             |
+| Undo           | Ctrl + Z             | Cmd + Z             |
+| Redo            | Ctrl + Y             | Cmd + Shift + Z     |
+| Copy Line      | Ctrl + C             | Cmd + C             |
+| Paste          | Ctrl + V             | Cmd + V             |
+| Delete Line    | Ctrl + Shift + K     | Cmd + Shift + K     |
+
+### Removed rows (no binding implements these)
+
+The following rows appeared in the previous table but are NOT registered in
+`hooks/useKeyboardShortcuts.ts` and are NOT Monaco defaults surfaced by
+`getEditorOptions`. They have been removed:
+
+| Removed action  | Reason                                              |
+| --------------- | --------------------------------------------------- |
+| Open File       | Not registered in `useKeyboardShortcuts.ts`. The file tree click handler does not bind a keyboard shortcut. |
+| New File        | Not registered. New files are created through the file-tree UI button. |
+| Close Tab       | Not registered. The Monaco tab strip handles close via mouse click; no `Ctrl + W` binding is registered. |
+| Next Tab        | Not registered. Tab switching is mouse-only. |
+| Previous Tab    | Not registered. Same reason as `Next Tab`. |
+| Duplicate Line | Not a registered Monaco default for the editor configuration in `getEditorOptions`. |
+
+### Notes
+
+- The **minimap toggle** (`Ctrl + B`) was never in the table; `getEditorOptions`
+  enables `minimap: { enabled: true }` so the minimap is always on (no toggle
+  needed). If a `Ctrl + B` toggle is desired in future, add a binding in
+  `useKeyboardShortcuts.ts` and re-add the row here.
+- macOS and Windows/Linux columns both match the registered bindings — the
+  `e.metaKey || e.ctrlKey` check in `useKeyboardShortcuts.ts` registers the
+  same shortcut for both modifiers.
 
 ## Docker Setup
 
