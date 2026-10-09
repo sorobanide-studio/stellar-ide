@@ -4,6 +4,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
+    "type-check": "tsc --noEmit",
     "start": "node dist/server.js",
     "dev": "ts-node src/server.ts"
   },

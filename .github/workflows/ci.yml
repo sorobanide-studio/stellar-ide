@@ -34,7 +34,7 @@ jobs:
     - name: Install dependencies
       run: npm ci
     - name: Type check
-      run: npm run type-check
+      run: npx tsc --noEmit
   build:
     name: build
     runs-on: ubuntu-latest
@@ -72,6 +72,7 @@ jobs:
     - type-check
     - build
     - test
+    - lsp
     if: always()
     steps:
     - name: Fail if any required job did not succeed
@@ -187,5 +188,24 @@ jobs:
         \ \"\\n%s\", $0 }\n    print \"\"\n    next\n  }\n' Dockerfile > /tmp/dockerfile-runs.sh\n\
         echo \"--- Dockerfile RUN bodies extracted for shellcheck ---\"\ncat /tmp/dockerfile-runs.sh\n\
         shellcheck --severity=warning --shell=sh /tmp/dockerfile-runs.sh\n"
+  lsp:
+    name: lsp
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stellar-lsp-server
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Install dependencies
+      run: npm ci
+    - name: Type check
+      run: npm run type-check
+    - name: Build
+      run: npm run build
 permissions:
   contents: read
