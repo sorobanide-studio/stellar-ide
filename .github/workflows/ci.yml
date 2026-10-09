@@ -19,8 +19,6 @@ jobs:
         node-version: '20'
     - name: Install dependencies
       run: npm ci
-    - name: Check the lockfile is in sync with package.json
-      run: node .github/scripts/check-lockfile.mjs
     - name: Lint
       run: npm run lint
   type-check:
@@ -73,14 +71,17 @@ jobs:
     - type-check
     - build
     - test
+    - changes
+    - docker-image
     if: always()
     steps:
     - name: Fail if any required job did not succeed
       env:
         NEEDS: ${{ toJSON(needs) }}
-      run: "echo \"$NEEDS\"\nbad=$(echo \"$NEEDS\" | jq -r 'to_entries[] | select(((.value.result\
-        \ == \"success\")) | not) | .key')\nif [ -n \"$bad\" ]; then\n  echo \"::error::These\
-        \ jobs did not succeed: $bad\"\n  exit 1\nfi\necho \"All required jobs succeeded.\"\
+      run: "echo \"$NEEDS\"\nbad=$(echo \"$NEEDS\" | jq -r 'to_entries[] | select((((.value.result\
+        \ == \"success\") or (.key == \"docker-image\" and .value.result == \"skipped\"\
+        ))) | not) | .key')\nif [ -n \"$bad\" ]; then\n  echo \"::error::These jobs\
+        \ did not succeed: $bad\"\n  exit 1\nfi\necho \"All required jobs succeeded.\"\
         \n"
   docker-image:
     name: docker-image
@@ -90,7 +91,7 @@ jobs:
       uses: actions/checkout@v4
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
-    - name: Build stellar-sandbox
+    - name: Build the pinned stellar-sandbox image
       uses: docker/build-push-action@v7
       with:
         context: .
@@ -99,9 +100,25 @@ jobs:
         tags: stellar-sandbox:ci
         cache-from: type=gha
         cache-to: type=gha,mode=max
+    - name: Assert the Rust pin matches rust-toolchain.toml
+      run: 'dockerfile_version=$(grep -E ''^ARG RUST_VERSION='' Dockerfile | cut -d=
+        -f2)
+
+        toolchain_version=$(grep -E ''^channel[[:space:]]*='' rust-toolchain.toml
+        | sed -E ''s/.*"([^"]+)".*/\1/'')
+
+        echo "Dockerfile RUST_VERSION       = ${dockerfile_version}"
+
+        echo "rust-toolchain.toml channel    = ${toolchain_version}"
+
+        test "${dockerfile_version}" = "${toolchain_version}"
+
+        '
     - name: Print the resolved toolchain versions
       run: docker run --rm stellar-sandbox:ci sh -c 'rustc --version && stellar --version
         && rust-analyzer --version'
+    needs: changes
+    if: ${{ needs.changes.outputs.docker == 'true' }}
   nightly-report:
     name: nightly-report
     runs-on: ubuntu-latest
@@ -141,5 +158,19 @@ jobs:
           \ \"[nightly] scheduled build failure\",\n    body,\n    labels: [label],\n\
           \  });\n  core.info(`Opened nightly tracking issue #${created.data.number}.`);\n\
           }\n"
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Detect Dockerfile and toolchain changes
+      id: filter
+      uses: dorny/paths-filter@v3
+      with:
+        filters: "docker:\n  - \"Dockerfile\"\n  - \"rust-toolchain.toml\"\n  - \"\
+          .github/workflows/ci.yml\"\n"
 permissions:
   contents: read

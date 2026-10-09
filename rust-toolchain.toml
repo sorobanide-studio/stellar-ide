@@ -1,0 +1,11 @@
+# Rust toolchain for anything built against the sandbox.
+#
+# The version here is the source of truth for local tooling and must stay in sync
+# with `ARG RUST_VERSION` in the Dockerfile; the `docker-image` CI job fails if
+# they drift. `wasm32v1-none` and `rust-analyzer` match the targets and components
+# the sandbox image installs.
+[toolchain]
+channel = "1.99.0"
+components = ["rust-analyzer"]
+targets = ["wasm32v1-none"]
+profile = "minimal"
