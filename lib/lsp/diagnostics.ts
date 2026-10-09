@@ -50,7 +50,18 @@ export function isUriClosed(uri: string): boolean {
 /**
  * Convert LSP diagnostics to Monaco markers
  * LSP severity: 1=Error, 2=Warning, 3=Information, 4=Hint
+ * LSP severity: 1=Error, 2=Warning, 3=Info, 4=Hint
  * Monaco severity: 8=Error, 4=Warning, 2=Info, 1=Hint
+ */
+const MONACO_SEVERITY: Record<number, number> = {
+  1: 8,
+  2: 4,
+  3: 2,
+  4: 1,
+};
+
+/**
+ * Convert LSP diagnostics to Monaco markers
  */
 export function convertToMonacoMarkers(diagnostics: Diagnostic[]): MonacoMarker[] {
   return diagnostics.map((diag) => ({
@@ -60,6 +71,7 @@ export function convertToMonacoMarkers(diagnostics: Diagnostic[]): MonacoMarker[
     endColumn: diag.range.end.character + 1,
     message: diag.message,
     severity: LSP_SEVERITY_TO_MONACO[diag.severity] ?? DEFAULT_MONACO_SEVERITY,
+    severity: MONACO_SEVERITY[diag.severity] ?? 2,
   }));
 }
 
@@ -87,14 +99,15 @@ export function findMatchingModel(
   const diagnosticPath = diagnosticSegments.join('/');
   const diagnosticFilename = diagnosticSegments[diagnosticSegments.length - 1] || '';
 
+  // Strategy 1: Exact match (checked across every model first, so two files
+  // that share a filename can never resolve to each other's model).
   for (const model of models) {
     const modelUri = model.uri?.toString() || '';
-
-    // Strategy 1: Exact match
     if (modelUri === uri) {
       console.log('[LSP Diagnostics] ✓ Exact URI match');
       return model;
     }
+  }
 
     const modelSegments = uriPathSegments(modelUri);
     const modelPath = modelSegments.join('/');
@@ -102,8 +115,15 @@ export function findMatchingModel(
     // Strategy 2: Same normalised path (differing only by `file://` prefix)
     if (modelPath && modelPath === diagnosticPath) {
       console.log('[LSP Diagnostics] ✓ Normalised path match');
+  // Strategy 2: Both URIs contain same filename
+  for (const model of models) {
+    const modelUri = model.uri?.toString() || '';
+    const modelFilename = modelUri.split('/').pop() || '';
+    if (modelFilename === diagnosticFilename && diagnosticFilename.endsWith('.rs')) {
+      console.log('[LSP Diagnostics] ✓ Filename match:', diagnosticFilename);
       return model;
     }
+  }
 
     // Strategy 3: A full path (directory + filename) is a suffix/prefix of the
     // other, so two different crates' `lib.rs` files never match on filename
@@ -114,6 +134,12 @@ export function findMatchingModel(
         diagnosticPath.endsWith('/' + modelPath))
     ) {
       console.log('[LSP Diagnostics] ✓ Path-segment match:', diagnosticPath);
+  // Strategy 3: Path contains the other
+  const uriPath = uri.replace('file://', '');
+  for (const model of models) {
+    const modelUri = model.uri?.toString() || '';
+    if (modelUri.includes(uriPath) || uriPath.includes(modelUri.replace('file://', ''))) {
+      console.log('[LSP Diagnostics] ✓ Path contains match');
       return model;
     }
   }
