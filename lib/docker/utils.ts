@@ -140,6 +140,16 @@ export function getWorkspaceVolumeName(walletAddress: string): string {
 export function getIdentityName(walletAddress: string): string {
   const prefix = walletAddress.slice(0, 10).toLowerCase();
   return `stellar-${prefix}`;
+ * Get the on-container path where a wallet's Stellar credentials are backed up.
+ *
+ * Deliberately kept outside the workspace (`getWorkspacePath()`) so deleting a
+ * project can never remove the wallet identity, and named after the wallet
+ * rather than the project.
+ * @param walletAddress The Stellar wallet public key
+ * @returns Backup directory path (does NOT sit under the workspace)
+ */
+export function getCredentialBackupPath(walletAddress: string): string {
+  return `/home/developer/.stellar-backups/${getContainerName(walletAddress)}`;
 }
 
 /**

@@ -19,6 +19,7 @@ export {
   getContainerName,
   isValidStellarAddress,
   getIdentityName,
+  getCredentialBackupPath,
   getProjectPath,
   getWorkspacePath,
   getWorkspaceVolumeName,
