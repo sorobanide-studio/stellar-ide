@@ -133,6 +133,47 @@ export async function waitForTerminalTransaction(
   throw new Error(timeoutMessage);
 }
 
+/**
+ * Decode a contract id out of a `createCustomContract` transaction's
+ * `returnValue` (an `ScVal`). Returns the literal string `"unknown"` when the
+ * value cannot be decoded into an address, so a malformed return value can
+ * never masquerade as a successful deployment.
+ *
+ * Exported for testability.
+ */
+export function parseContractIdFromReturnValue(returnValue: unknown): string {
+  if (!returnValue) {
+    return "unknown";
+  }
+
+  const scVal = returnValue as {
+    address?: () => unknown;
+    toString?: () => string;
+  };
+
+  if (typeof scVal.address === "function") {
+    try {
+      return StellarSdk.Address.fromScAddress(
+        scVal.address() as Parameters<
+          typeof StellarSdk.Address.fromScAddress
+        >[0]
+      ).toString();
+    } catch {
+      return "unknown";
+    }
+  }
+
+  if (typeof scVal.toString === "function") {
+    const asString = scVal.toString();
+    // A default Object#toString() ("[object Object]") is not a contract id.
+    if (asString && asString !== "[object Object]") {
+      return asString;
+    }
+  }
+
+  return "unknown";
+}
+
 export async function deployWithWallet(
   walletAddress: string,
   logToTerminal: (msg: string, type: string) => void,
@@ -346,6 +387,45 @@ export async function deployWithWallet(
           contractIdStr = StellarSdk.Address.fromScAddress(contractIdScVal.address()).toString();
         } else if (contractIdScVal.toString) {
           contractIdStr = contractIdScVal.toString();
+        finalTxInfo = await server.getTransaction(createResult.hash);
+        if (finalTxInfo.status === "SUCCESS") {
+          // Extract contract ID from transaction result (ScVal -> StrKey).
+          const contractIdStr = parseContractIdFromReturnValue(
+            finalTxInfo.returnValue
+          );
+          if (contractIdStr === "unknown") {
+            logToTerminal(
+              "Warning: Could not parse contract ID from transaction return value",
+              "warn"
+            );
+          }
+          
+          logToTerminal("", "log");
+          logToTerminal(" Contract Deployed Successfully!", "log");
+          logToTerminal("", "log");
+          logToTerminal(` Contract ID:`, "info");
+          logToTerminal(`   ${contractIdStr}`, "log");
+          logToTerminal("", "log");
+          logToTerminal(` Explorer Links:`, "info");
+          logToTerminal(
+            `   → https://stellar.expert/explorer/testnet/contract/${contractIdStr}`,
+            "info"
+          );
+          logToTerminal(
+            `   → https://lab.stellar.org/r/testnet/contract/${contractIdStr}`,
+            "info"
+          );
+          
+          return {
+            success: true,
+            contractId: contractIdStr,
+            transactionHash: createResult.hash,
+          };
+        }
+        if (finalTxInfo.status === "FAILED") {
+          throw new Error(
+            `Contract creation failed: ${finalTxInfo.resultXdr}`
+          );
         }
       } catch (e) {
         logToTerminal(`Warning: Could not parse contract ID: ${e}`, "warn");

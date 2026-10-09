@@ -27,6 +27,11 @@ describe("wallet-deploy is browser safe", () => {
     expect(/\bBuffer\b/.test(source)).toBe(false);
   });
 });
+import * as StellarSdk from "@stellar/stellar-sdk";
+import {
+  generateDeploymentSalt,
+  parseContractIdFromReturnValue,
+} from "../../lib/wallet-deploy";
 
 describe("generateDeploymentSalt", () => {
   it("always returns exactly 32 random bytes", () => {
@@ -51,9 +56,19 @@ describe("generateDeploymentSalt", () => {
     for (let i = 0; i < 16; i++) {
       const firstFive = [...generateDeploymentSalt().slice(0, 5)];
       const allAsciiDigits = firstFive.every((b) => b >= 0x30 && b <= 0x39);
+    // The previous implementation prepended Date.now().toString() (a 13-digit
+    // ASCII number) to the salt buffer. A cryptographic salt has no such
+    // prefix — sample 16 salts and assert none starts with 5 ASCII digits.
+    for (let i = 0; i < 16; i++) {
+      const salt = generateDeploymentSalt();
+      const firstFive = salt.subarray(0, 5);
+      const allAsciiDigits = [...firstFive].every(
+        (b) => b >= 0x30 && b <= 0x39,
+      );
       expect(allAsciiDigits).toBe(false);
     }
   });
+});
 
   it("does NOT carry the base-36 signature of Math.random()", () => {
     for (let i = 0; i < 32; i++) {
@@ -67,7 +82,46 @@ describe("generateDeploymentSalt", () => {
     // almost certainly Math.random().toString(36).
     throw new Error(
       "all 32 salts looked like Math.random().toString(36) output"
+describe("parseContractIdFromReturnValue", () => {
+  it("decodes an ScVal address into its StrKey representation", () => {
+    const keypair = StellarSdk.Keypair.random();
+    const address = new StellarSdk.Address(keypair.publicKey());
+    const scAddress = address.toScAddress();
+
+    const returnValue = {
+      address: () => scAddress,
+      // A "useless" toString must not win over the decodable address.
+      toString: () => "[object Object]",
+    };
+
+    expect(parseContractIdFromReturnValue(returnValue)).toBe(
+      keypair.publicKey(),
     );
+  });
+
+  it("falls back to \"unknown\" when there is no .address() and toString() is useless", () => {
+    expect(
+      parseContractIdFromReturnValue({ toString: () => "[object Object]" }),
+    ).toBe("unknown");
+  });
+
+  it("falls back to \"unknown\" for a plain object with no usable accessors", () => {
+    expect(parseContractIdFromReturnValue({})).toBe("unknown");
+  });
+
+  it("falls back to \"unknown\" for null and undefined", () => {
+    expect(parseContractIdFromReturnValue(null)).toBe("unknown");
+    expect(parseContractIdFromReturnValue(undefined)).toBe("unknown");
+  });
+
+  it("falls back to \"unknown\" when .address() throws instead of surfacing an error", () => {
+    const returnValue = {
+      address: () => {
+        throw new Error("cannot decode scval");
+      },
+    };
+
+    expect(parseContractIdFromReturnValue(returnValue)).toBe("unknown");
   });
 });
 
