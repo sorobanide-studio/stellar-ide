@@ -107,6 +107,20 @@ export function getContainerName(walletAddress: string): string {
   if (!isValidStellarAddress(walletAddress)) {
     throw new Error(
       'Invalid wallet address: expected a Stellar ed25519 public key (56 base32 characters starting with G)'
+ * @throws Error when the address is missing or not a 56-character G-address
+ */
+export function getContainerName(walletAddress: string): string {
+  // Reject a missing or malformed address explicitly. Previously a missing
+  // address threw `TypeError: Cannot read properties of undefined (reading
+  // 'slice')` from deep inside this call and surfaced as a 500.
+  if (typeof walletAddress !== 'string' || walletAddress.trim() === '') {
+    throw new Error(
+      'Invalid wallet address: a Stellar wallet public key is required'
+    );
+  }
+  if (walletAddress.length !== 56 || !walletAddress.startsWith('G')) {
+    throw new Error(
+      'Invalid wallet address: expected a 56-character Stellar public key starting with G'
     );
   }
 
