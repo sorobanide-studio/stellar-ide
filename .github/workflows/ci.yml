@@ -17,7 +17,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: npm
     - name: Install dependencies
       run: npm ci
     - name: Lint
@@ -32,7 +31,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: npm
     - name: Install dependencies
       run: npm ci
     - name: Type check
@@ -47,7 +45,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: npm
     - name: Install dependencies
       run: npm ci
     - name: Build
@@ -63,7 +60,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: npm
     - name: Install dependencies
       run: npm ci
     - name: Test
@@ -76,17 +72,17 @@ jobs:
     - type-check
     - build
     - test
-    - changes
-    - docker-image
+    - audit
+    - secret-scan
+    - lsp
     if: always()
     steps:
     - name: Fail if any required job did not succeed
       env:
         NEEDS: ${{ toJSON(needs) }}
-      run: "echo \"$NEEDS\"\nbad=$(echo \"$NEEDS\" | jq -r 'to_entries[] | select((((.value.result\
-        \ == \"success\") or (.key == \"docker-image\" and .value.result == \"skipped\"\
-        ))) | not) | .key')\nif [ -n \"$bad\" ]; then\n  echo \"::error::These jobs\
-        \ did not succeed: $bad\"\n  exit 1\nfi\necho \"All required jobs succeeded.\"\
+      run: "echo \"$NEEDS\"\nbad=$(echo \"$NEEDS\" | jq -r 'to_entries[] | select(((.value.result\
+        \ == \"success\")) | not) | .key')\nif [ -n \"$bad\" ]; then\n  echo \"::error::These\
+        \ jobs did not succeed: $bad\"\n  exit 1\nfi\necho \"All required jobs succeeded.\"\
         \n"
   docker-image:
     name: docker-image
@@ -217,5 +213,37 @@ jobs:
       run: npm run type-check
     - name: Build
       run: npm run build
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Install root dependencies
+      run: npm ci
+    - name: Audit root dependencies (high and critical fail)
+      run: node .github/scripts/audit.mjs
+    - name: Install stellar-lsp-server dependencies
+      working-directory: stellar-lsp-server
+      run: npm ci
+    - name: Audit stellar-lsp-server dependencies (high and critical fail)
+      working-directory: stellar-lsp-server
+      run: node ../.github/scripts/audit.mjs
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout full history
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Scan the full commit history for secrets
+      run: "docker run --rm \\\n  -v \"${{ github.workspace }}:/repo\" \\\n  -w /repo\
+        \ \\\n  ghcr.io/gitleaks/gitleaks:v8.30.1 \\\n  detect --source=/repo --config=/repo/.gitleaks.toml\
+        \ --redact --verbose --exit-code=1\n"
 permissions:
   contents: read
