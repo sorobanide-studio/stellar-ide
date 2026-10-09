@@ -17,6 +17,41 @@ interface UseLSPSyncParams {
 }
 
 /**
+ * Tracks the last content this hook handed to the LSP, keyed by document uri.
+ *
+ * A single shared string (the previous implementation) belongs to whichever
+ * file was last open, so switching from file A to file B compared B's content
+ * against A's snapshot and could skip a real change. Keeping one entry per uri
+ * makes the "did this document actually change?" check correct for multi-file
+ * sessions.
+ *
+ * Exported for testability.
+ */
+export interface ContentTracker {
+  hasChanged(uri: string, content: string): boolean;
+  lastContent(uri: string): string | undefined;
+  reset(uri: string): void;
+}
+
+export function createContentTracker(): ContentTracker {
+  const last = new Map<string, string>();
+
+  return {
+    hasChanged(uri, content) {
+      if (last.get(uri) === content) {
+        return false;
+      }
+      last.set(uri, content);
+      return true;
+    },
+    lastContent: (uri) => last.get(uri),
+    reset: (uri) => {
+      last.delete(uri);
+    },
+  };
+}
+
+/**
  * Hook to sync editor content with LSP server
  * Handles opening files and debounced content changes
  */
@@ -28,7 +63,10 @@ export function useLSPSync({
   openTextDocument,
   changeTextDocument,
 }: UseLSPSyncParams): void {
-  const lastContentRef = useRef<string>("");
+  const trackerRef = useRef<ContentTracker | null>(null);
+  if (!trackerRef.current) {
+    trackerRef.current = createContentTracker();
+  }
 
   // Open file in LSP when connected (only for Rust files)
   useEffect(() => {
@@ -52,13 +90,12 @@ export function useLSPSync({
     }
 
     const content = fileContents.get(openFile.path) || "";
+    const tracker = trackerRef.current;
 
-    // Only send if content actually changed
-    if (content === lastContentRef.current) {
+    // Only send if *this* document's content actually changed.
+    if (!tracker || !tracker.hasChanged(fileUri, content)) {
       return;
     }
-
-    lastContentRef.current = content;
 
     // Invalidate inlay hints cache when content changes
     invalidateHintsCache();
