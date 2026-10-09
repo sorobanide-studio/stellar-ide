@@ -32,6 +32,19 @@ interface UseLSPClientReturn {
   requestCodeAction: (uri: string, range: { start: { line: number; character: number }; end: { line: number; character: number } }, context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number }> }, token?: CancellationTokenLike) => Promise<CodeAction[]>;
   requestDocumentSymbols: (uri: string, token?: CancellationTokenLike) => Promise<DocumentSymbol[]>;
   requestDocumentHighlight: (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike) => Promise<DocumentHighlight[]>;
+  closeTextDocument: (uri?: string) => void;
+  requestInlayHints: (uri: string, range: { startLine: number; endLine: number }) => Promise<InlayHint[]>;
+  requestHover: (uri: string, position: { line: number; character: number }) => Promise<{ contents: string } | null>;
+  requestCompletion: (uri: string, position: { line: number; character: number }) => Promise<unknown[]>;
+  requestDefinition: (uri: string, position: { line: number; character: number }) => Promise<unknown[]>;
+  requestReferences: (uri: string, position: { line: number; character: number }, context?: { includeDeclaration?: boolean }) => Promise<unknown[]>;
+  requestPrepareRename: (uri: string, position: { line: number; character: number }) => Promise<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string } | null>;
+  requestRename: (uri: string, position: { line: number; character: number }, newName: string) => Promise<unknown>;
+  requestSignatureHelp: (uri: string, position: { line: number; character: number }) => Promise<unknown | null>;
+  requestFormatting: (uri: string) => Promise<unknown[]>;
+  requestCodeAction: (uri: string, range: { start: { line: number; character: number }; end: { line: number; character: number } }, context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number }> }) => Promise<CodeAction[]>;
+  requestDocumentSymbols: (uri: string) => Promise<DocumentSymbol[]>;
+  requestDocumentHighlight: (uri: string, position: { line: number; character: number }) => Promise<DocumentHighlight[]>;
   wsRef: React.RefObject<WebSocket | null>;
 }
 
@@ -73,7 +86,7 @@ export function useLSPClient(
   });
 
   // Document synchronization
-  const { openTextDocument, changeTextDocument } = useLSPDocumentSync({
+  const { openTextDocument, changeTextDocument, closeTextDocument } = useLSPDocumentSync({
     wsRef,
     isInitialized,
     currentFileUri: fileUri,
@@ -104,6 +117,7 @@ export function useLSPClient(
     diagnosticsCount,
     openTextDocument,
     changeTextDocument,
+    closeTextDocument,
     requestInlayHints,
     requestHover,
     requestCompletion,

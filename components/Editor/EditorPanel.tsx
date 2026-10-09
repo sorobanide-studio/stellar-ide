@@ -74,6 +74,7 @@ export default function EditorPanel({
     diagnosticsCount,
     openTextDocument,
     changeTextDocument,
+    closeTextDocument,
     requestInlayHints,
     requestCompletion,
     requestHover,
@@ -105,6 +106,7 @@ export default function EditorPanel({
     fileContents,
     openTextDocument,
     changeTextDocument,
+    closeTextDocument,
   });
 
   // Clear diagnostics when file closes
