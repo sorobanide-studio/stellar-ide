@@ -510,7 +510,13 @@ The application uses Docker containers to provide isolated development environme
 
 - **One container per project** - Each project runs in its own Docker container
 - **Soroban template initialized** - Every new project comes with a working contract template
-- **File persistence** - Files are stored within the container and synced with the UI
+- **File persistence** - Project files live in a per-wallet named Docker volume mounted at `/home/developer/workspace`, so they survive container removal and image rebuilds
+
+### Data persistence
+
+Each wallet's container mounts a named volume (`soroban-<wallet-prefix>-workspace`, see `getWorkspaceVolumeName` in `lib/docker/utils.ts`) at `/home/developer/workspace`. Because the workspace is a volume rather than the container's writable layer, removing or recreating the container — and rebuilding the `stellar-sandbox` image — leaves project files and the Stellar home (`.stellar`) intact.
+
+Deleting a container retains the workspace volume by default. The API surfaces the choice: `POST /api/docker` with `{ "action": "delete", "walletAddress": "...", "removeVolume": true }` deletes the container *and* its volume, while omitting `removeVolume` keeps the files.
 
 ### Container Management
 
