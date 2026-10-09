@@ -6,16 +6,6 @@
 import type { editor, languages, Position, CancellationToken, Uri } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let renameProviderRegistered = false;
-
-/**
- * Check if rename provider is already registered
- */
-export function isRenameProviderRegistered(): boolean {
-  return renameProviderRegistered;
-}
-
 /**
  * Request prepare rename from LSP
  */
@@ -119,18 +109,12 @@ function convertToMonacoWorkspaceEdit(
 
 /**
  * Register the rename provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  * Monaco automatically handles F2 keyboard shortcut
  */
 export function registerRenameProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (renameProviderRegistered) {
-    return null;
-  }
-
-  renameProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerRenameProvider("rust", {
     provideRenameEdits: async (
       model: editor.ITextModel,

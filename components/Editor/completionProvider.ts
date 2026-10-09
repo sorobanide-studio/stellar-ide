@@ -6,16 +6,6 @@
 import type { editor, languages, Position, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let completionProviderRegistered = false;
-
-/**
- * Check if completion provider is already registered
- */
-export function isCompletionProviderRegistered(): boolean {
-  return completionProviderRegistered;
-}
-
 /**
  * Request completion from LSP
  */
@@ -113,17 +103,11 @@ function convertCompletionItems(
 
 /**
  * Register the completion provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerCompletionProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (completionProviderRegistered) {
-    return null;
-  }
-
-  completionProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerCompletionItemProvider("rust", {
     triggerCharacters: [".", ":", "<", '"', "'", "/"],
 

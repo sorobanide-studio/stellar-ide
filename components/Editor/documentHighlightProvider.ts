@@ -6,16 +6,6 @@
 import type { editor, languages, Position, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let highlightProviderRegistered = false;
-
-/**
- * Check if highlight provider is already registered
- */
-export function isHighlightProviderRegistered(): boolean {
-  return highlightProviderRegistered;
-}
-
 /**
  * Request document highlight from LSP
  */
@@ -69,17 +59,11 @@ function convertToMonacoHighlights(
 
 /**
  * Register the document highlight provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerDocumentHighlightProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (highlightProviderRegistered) {
-    return null;
-  }
-
-  highlightProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerDocumentHighlightProvider("rust", {
     provideDocumentHighlights: async (
       model: editor.ITextModel,

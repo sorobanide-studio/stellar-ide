@@ -6,16 +6,6 @@
 import type { editor, languages, Position, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let referenceProviderRegistered = false;
-
-/**
- * Check if reference provider is already registered
- */
-export function isReferenceProviderRegistered(): boolean {
-  return referenceProviderRegistered;
-}
-
 /**
  * Request references from LSP
  */
@@ -81,18 +71,12 @@ function convertToMonacoLocation(
 
 /**
  * Register the reference provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  * Monaco automatically handles Shift+F12 keyboard shortcut
  */
 export function registerReferenceProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (referenceProviderRegistered) {
-    return null;
-  }
-
-  referenceProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerReferenceProvider("rust", {
     provideReferences: async (
       model: editor.ITextModel,

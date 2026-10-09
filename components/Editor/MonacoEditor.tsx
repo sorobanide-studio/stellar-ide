@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import type {
   MonacoType,
@@ -13,17 +13,11 @@ import type {
   LSPFunctionsRef,
 } from "./types";
 import { getLanguageFromFilename, getEditorOptions } from "./constants";
-import { registerInlayHintsProvider } from "./inlayHints";
-import { registerCompletionProvider } from "./completionProvider";
-import { registerHoverProvider } from "./hoverProvider";
-import { registerDefinitionProvider } from "./definitionProvider";
-import { registerReferenceProvider } from "./referenceProvider";
-import { registerRenameProvider } from "./renameProvider";
-import { registerFormatProvider } from "./formatProvider";
-import { registerCodeActionProvider } from "./codeActionProvider";
-import { registerDocumentSymbolProvider } from "./documentSymbolProvider";
-import { registerDocumentHighlightProvider } from "./documentHighlightProvider";
 import { useEditorZoom } from "./useEditorZoom";
+import {
+  registerLanguageProviders,
+  disposeLanguageProviders,
+} from "./providerRegistry";
 
 interface MonacoEditorProps {
   file: FileNode;
@@ -69,61 +63,12 @@ export default function MonacoEditorWrapper({
   const editorRef = useRef<MonacoEditorType | null>(null);
   const { handleMouseWheel, cleanup } = useEditorZoom(editorRef);
 
-  const handleEditorDidMount = useCallback(
-    (editorInstance: MonacoEditorType, monaco: MonacoType) => {
-      editorRef.current = editorInstance;
-      editorInstance.focus();
+  const monacoRef = useRef<MonacoType | null>(null);
 
-      // Store Monaco instance globally for LSP client
-      window.monacoInstance = monaco;
-      console.log("[MonacoEditor] Monaco instance stored globally");
-
-      // Store LSP functions for providers
-      window.lspFunctions = {
-        requestInlayHints,
-        requestCompletion,
-        requestHover,
-        requestDefinition,
-        requestReferences,
-        requestPrepareRename,
-        requestRename,
-        requestFormatting,
-        requestCodeAction,
-        requestDocumentSymbols,
-        requestDocumentHighlight,
-      };
-
-      // Register language providers (only once each)
-      registerInlayHintsProvider(monaco);
-      registerCompletionProvider(monaco);
-      registerHoverProvider(monaco);
-      registerDefinitionProvider(monaco);
-      registerReferenceProvider(monaco);
-      registerRenameProvider(monaco);
-      registerFormatProvider(monaco);
-      registerCodeActionProvider(monaco);
-      registerDocumentSymbolProvider(monaco);
-      registerDocumentHighlightProvider(monaco);
-
-      // Add wheel zoom handler
-      if (containerRef.current) {
-        containerRef.current.addEventListener("wheel", handleMouseWheel, {
-          passive: false,
-        });
-      }
-
-      // Call parent mount handler
-      onMount(editorInstance, monaco);
-
-      // Cleanup function
-      return () => {
-        if (containerRef.current) {
-          containerRef.current.removeEventListener("wheel", handleMouseWheel);
-        }
-        cleanup();
-      };
-    },
-    [
+  // Keep the request functions used by the registered providers in sync with
+  // the latest props WITHOUT re-registering the providers on every render.
+  useEffect(() => {
+    window.lspFunctions = {
       requestInlayHints,
       requestCompletion,
       requestHover,
@@ -135,12 +80,61 @@ export default function MonacoEditorWrapper({
       requestCodeAction,
       requestDocumentSymbols,
       requestDocumentHighlight,
-      onMount,
-      containerRef,
-      handleMouseWheel,
-      cleanup,
-    ]
+    };
+  }, [
+    requestInlayHints,
+    requestCompletion,
+    requestHover,
+    requestDefinition,
+    requestReferences,
+    requestPrepareRename,
+    requestRename,
+    requestFormatting,
+    requestCodeAction,
+    requestDocumentSymbols,
+    requestDocumentHighlight,
+  ]);
+
+  const handleEditorDidMount = useCallback(
+    (editorInstance: MonacoEditorType, monaco: MonacoType) => {
+      editorRef.current = editorInstance;
+      editorInstance.focus();
+
+      // Store Monaco instance globally for LSP client
+      monacoRef.current = monaco;
+      window.monacoInstance = monaco;
+      console.log("[MonacoEditor] Monaco instance stored globally");
+
+      // Register each language provider exactly once per Monaco instance.
+      registerLanguageProviders(monaco);
+
+      // Add wheel zoom handler
+      if (containerRef.current) {
+        containerRef.current.addEventListener("wheel", handleMouseWheel, {
+          passive: false,
+        });
+      }
+
+      // Call parent mount handler
+      onMount(editorInstance, monaco);
+    },
+    [onMount, containerRef, handleMouseWheel]
   );
+
+  // Dispose the language providers and the wheel listener on unmount.
+  useEffect(() => {
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener("wheel", handleMouseWheel);
+      }
+      cleanup();
+      if (monacoRef.current) {
+        disposeLanguageProviders(monacoRef.current);
+        monacoRef.current = null;
+      }
+      delete window.lspFunctions;
+    };
+  }, [containerRef, handleMouseWheel, cleanup]);
 
   return (
     <Editor

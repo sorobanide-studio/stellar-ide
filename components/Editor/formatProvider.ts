@@ -6,16 +6,6 @@
 import type { editor, languages, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let formatProviderRegistered = false;
-
-/**
- * Check if format provider is already registered
- */
-export function isFormatProviderRegistered(): boolean {
-  return formatProviderRegistered;
-}
-
 /**
  * Request formatting from LSP
  */
@@ -53,17 +43,11 @@ function convertToMonacoEdits(
 
 /**
  * Register the format provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerFormatProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (formatProviderRegistered) {
-    return null;
-  }
-
-  formatProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerDocumentFormattingEditProvider(
     "rust",
     {

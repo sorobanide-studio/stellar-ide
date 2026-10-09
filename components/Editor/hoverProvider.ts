@@ -6,16 +6,6 @@
 import type { editor, languages, Position, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let hoverProviderRegistered = false;
-
-/**
- * Check if hover provider is already registered
- */
-export function isHoverProviderRegistered(): boolean {
-  return hoverProviderRegistered;
-}
-
 /**
  * Request hover info from LSP
  */
@@ -84,17 +74,11 @@ function convertHoverContent(hover: HoverResult): languages.IMarkdownString[] {
 
 /**
  * Register the hover provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerHoverProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (hoverProviderRegistered) {
-    return null;
-  }
-
-  hoverProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerHoverProvider("rust", {
     provideHover: async (
       model: editor.ITextModel,

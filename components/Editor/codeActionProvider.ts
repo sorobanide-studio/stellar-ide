@@ -7,16 +7,6 @@
 import type { editor, languages, Range, CancellationToken } from "monaco-editor";
 import type { MonacoType } from "./types";
 
-// Global state
-let codeActionProviderRegistered = false;
-
-/**
- * Check if code action provider is already registered
- */
-export function isCodeActionProviderRegistered(): boolean {
-  return codeActionProviderRegistered;
-}
-
 /**
  * Request code actions from LSP
  */
@@ -58,17 +48,11 @@ function convertToMonacoEdits(
 
 /**
  * Register the code action provider for Rust
- * Only registers once globally
+ * De-duplicated per Monaco instance by registerLanguageProviders
  */
 export function registerCodeActionProvider(
   monaco: MonacoType
-): { dispose: () => void } | null {
-  if (codeActionProviderRegistered) {
-    return null;
-  }
-
-  codeActionProviderRegistered = true;
-
+): { dispose: () => void } {
   const provider = monaco.languages.registerCodeActionProvider("rust", {
     provideCodeActions: async (
       model: editor.ITextModel,
