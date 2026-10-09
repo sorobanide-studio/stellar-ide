@@ -4,6 +4,7 @@
  */
 
 import { awaitResponse, createRequestId, TextEdit } from './utils';
+import { awaitResponse, createRequestId, type CancellationTokenLike, TextEdit } from './utils';
 
 /**
  * Request code completion
@@ -12,6 +13,7 @@ export function requestCompletion(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<unknown[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -23,6 +25,17 @@ export function requestCompletion(
     // Handle both array and {items: []} formats
     return Array.isArray(result) ? result : (result as { items?: unknown[] })?.items || [];
   });
+  const response = awaitResponse<unknown[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => {
+      // Handle both array and {items: []} formats
+      return Array.isArray(result) ? result : (result as { items?: unknown[] })?.items || [];
+    },
+    token
+  );
 
   ws.send(JSON.stringify({
     jsonrpc: '2.0',
@@ -44,6 +57,7 @@ export function requestSignatureHelp(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<unknown | null> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -57,6 +71,8 @@ export function requestSignatureHelp(
     timeout,
     null,
     (result) => result || null
+    (result) => result || null,
+    token
   );
 
   ws.send(JSON.stringify({
@@ -78,6 +94,7 @@ export function requestSignatureHelp(
 export function requestFormatting(
   ws: WebSocket,
   uri: string,
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<TextEdit[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -87,6 +104,13 @@ export function requestFormatting(
   const requestId = createRequestId();
   const response = awaitResponse<TextEdit[]>(ws, requestId, timeout, [], (result) =>
     (result as TextEdit[]) || []
+  const response = awaitResponse<TextEdit[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (result as TextEdit[]) || [],
+    token
   );
 
   ws.send(JSON.stringify({

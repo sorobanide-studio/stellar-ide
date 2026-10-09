@@ -4,6 +4,7 @@
  */
 
 import { awaitResponse, createRequestId } from './utils';
+import { awaitResponse, createRequestId, type CancellationTokenLike } from './utils';
 
 /**
  * Request go to definition
@@ -12,6 +13,7 @@ export function requestDefinition(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<unknown[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -21,6 +23,13 @@ export function requestDefinition(
   const requestId = createRequestId();
   const response = awaitResponse<unknown[]>(ws, requestId, timeout, [], (result) =>
     Array.isArray(result) ? result : result ? [result] : []
+  const response = awaitResponse<unknown[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : result ? [result] : []),
+    token
   );
 
   ws.send(JSON.stringify({
@@ -44,6 +53,7 @@ export function requestReferences(
   uri: string,
   position: { line: number; character: number },
   context?: { includeDeclaration?: boolean },
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<unknown[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -53,6 +63,13 @@ export function requestReferences(
   const requestId = createRequestId();
   const response = awaitResponse<unknown[]>(ws, requestId, timeout, [], (result) =>
     Array.isArray(result) ? result : []
+  const response = awaitResponse<unknown[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : []),
+    token
   );
 
   ws.send(JSON.stringify({
@@ -76,6 +93,7 @@ export function requestHover(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<{ contents: string } | null> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -89,6 +107,8 @@ export function requestHover(
     timeout,
     null,
     (result) => (result as { contents: string }) || null
+    (result) => (result as { contents: string }) || null,
+    token
   );
 
   ws.send(JSON.stringify({
@@ -129,6 +149,7 @@ export interface DocumentSymbol {
 export function requestDocumentSymbols(
   ws: WebSocket,
   uri: string,
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<DocumentSymbol[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -138,6 +159,13 @@ export function requestDocumentSymbols(
   const requestId = createRequestId();
   const response = awaitResponse<DocumentSymbol[]>(ws, requestId, timeout, [], (result) =>
     Array.isArray(result) ? result : []
+  const response = awaitResponse<DocumentSymbol[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : []),
+    token
   );
 
   ws.send(JSON.stringify({
@@ -170,6 +198,7 @@ export function requestDocumentHighlight(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<DocumentHighlight[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -179,6 +208,13 @@ export function requestDocumentHighlight(
   const requestId = createRequestId();
   const response = awaitResponse<DocumentHighlight[]>(ws, requestId, timeout, [], (result) =>
     Array.isArray(result) ? result : []
+  const response = awaitResponse<DocumentHighlight[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (Array.isArray(result) ? result : []),
+    token
   );
 
   ws.send(JSON.stringify({

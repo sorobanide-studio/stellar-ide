@@ -11,7 +11,8 @@ import type { MonacoType } from "./types";
  */
 async function requestDefinitionInfo(
   uri: string,
-  position: { line: number; character: number }
+  position: { line: number; character: number },
+  token?: CancellationToken
 ): Promise<LocationResult[]> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestDefinition) {
@@ -19,7 +20,7 @@ async function requestDefinitionInfo(
   }
 
   try {
-    const result = await lspFn.requestDefinition(uri, position);
+    const result = await lspFn.requestDefinition(uri, position, token);
     // LSP can return Location, Location[], or LocationLink[]
     if (!result) return [];
     return Array.isArray(result) ? result : [result];
@@ -76,7 +77,7 @@ export function registerDefinitionProvider(
     provideDefinition: async (
       model: editor.ITextModel,
       position: Position,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.Definition | null> => {
       const uri = model.uri.toString();
 
@@ -86,7 +87,7 @@ export function registerDefinitionProvider(
         character: position.column - 1,
       };
 
-      const locations = await requestDefinitionInfo(uri, lspPosition);
+      const locations = await requestDefinitionInfo(uri, lspPosition, token);
 
       if (locations.length === 0) {
         return null;

@@ -5,7 +5,7 @@
 
 // Utilities
 export { createRequestId } from './utils';
-export type { TextEdit } from './utils';
+export type { TextEdit, CancellationTokenLike } from './utils';
 
 // Notifications
 export {

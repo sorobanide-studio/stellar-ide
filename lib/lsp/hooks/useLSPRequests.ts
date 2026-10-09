@@ -5,7 +5,7 @@
 
 import { useCallback } from 'react';
 import { InlayHint } from '../types';
-import { CodeAction } from '../requests';
+import { type CodeAction, type CancellationTokenLike } from '../requests';
 import {
   requestInlayHints as sendInlayHintsRequest,
   requestHover as sendHoverRequest,
@@ -29,18 +29,18 @@ interface UseLSPRequestsProps {
 }
 
 interface UseLSPRequestsReturn {
-  requestInlayHints: (uri: string, range: { startLine: number; endLine: number }) => Promise<InlayHint[]>;
-  requestHover: (uri: string, position: { line: number; character: number }) => Promise<{ contents: string } | null>;
-  requestCompletion: (uri: string, position: { line: number; character: number }) => Promise<unknown[]>;
-  requestDefinition: (uri: string, position: { line: number; character: number }) => Promise<unknown[]>;
-  requestReferences: (uri: string, position: { line: number; character: number }, context?: { includeDeclaration?: boolean }) => Promise<unknown[]>;
-  requestPrepareRename: (uri: string, position: { line: number; character: number }) => Promise<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string } | null>;
-  requestRename: (uri: string, position: { line: number; character: number }, newName: string) => Promise<unknown>;
-  requestSignatureHelp: (uri: string, position: { line: number; character: number }) => Promise<unknown | null>;
-  requestFormatting: (uri: string) => Promise<unknown[]>;
-  requestCodeAction: (uri: string, range: { start: { line: number; character: number }; end: { line: number; character: number } }, context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number }> }) => Promise<CodeAction[]>;
-  requestDocumentSymbols: (uri: string) => Promise<DocumentSymbol[]>;
-  requestDocumentHighlight: (uri: string, position: { line: number; character: number }) => Promise<DocumentHighlight[]>;
+  requestInlayHints: (uri: string, range: { startLine: number; endLine: number }, token?: CancellationTokenLike) => Promise<InlayHint[]>;
+  requestHover: (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike) => Promise<{ contents: string } | null>;
+  requestCompletion: (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike) => Promise<unknown[]>;
+  requestDefinition: (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike) => Promise<unknown[]>;
+  requestReferences: (uri: string, position: { line: number; character: number }, context?: { includeDeclaration?: boolean }, token?: CancellationTokenLike) => Promise<unknown[]>;
+  requestPrepareRename: (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike) => Promise<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string } | null>;
+  requestRename: (uri: string, position: { line: number; character: number }, newName: string, token?: CancellationTokenLike) => Promise<unknown>;
+  requestSignatureHelp: (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike) => Promise<unknown | null>;
+  requestFormatting: (uri: string, token?: CancellationTokenLike) => Promise<unknown[]>;
+  requestCodeAction: (uri: string, range: { start: { line: number; character: number }; end: { line: number; character: number } }, context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number }> }, token?: CancellationTokenLike) => Promise<CodeAction[]>;
+  requestDocumentSymbols: (uri: string, token?: CancellationTokenLike) => Promise<DocumentSymbol[]>;
+  requestDocumentHighlight: (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike) => Promise<DocumentHighlight[]>;
 }
 
 /**
@@ -52,108 +52,108 @@ export function useLSPRequests({
 }: UseLSPRequestsProps): UseLSPRequestsReturn {
   // Request inlay hints
   const requestInlayHints = useCallback(
-    (uri: string, range: { startLine: number; endLine: number }): Promise<InlayHint[]> => {
+    (uri: string, range: { startLine: number; endLine: number }, token?: CancellationTokenLike): Promise<InlayHint[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendInlayHintsRequest(ws, uri, range);
+      return sendInlayHintsRequest(ws, uri, range, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request hover
   const requestHover = useCallback(
-    (uri: string, position: { line: number; character: number }): Promise<{ contents: string } | null> => {
+    (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike): Promise<{ contents: string } | null> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve(null);
       }
-      return sendHoverRequest(ws, uri, position);
+      return sendHoverRequest(ws, uri, position, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request completion
   const requestCompletion = useCallback(
-    (uri: string, position: { line: number; character: number }): Promise<unknown[]> => {
+    (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike): Promise<unknown[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendCompletionRequest(ws, uri, position);
+      return sendCompletionRequest(ws, uri, position, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request definition
   const requestDefinition = useCallback(
-    (uri: string, position: { line: number; character: number }): Promise<unknown[]> => {
+    (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike): Promise<unknown[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendDefinitionRequest(ws, uri, position);
+      return sendDefinitionRequest(ws, uri, position, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request references
   const requestReferences = useCallback(
-    (uri: string, position: { line: number; character: number }, context?: { includeDeclaration?: boolean }): Promise<unknown[]> => {
+    (uri: string, position: { line: number; character: number }, context?: { includeDeclaration?: boolean }, token?: CancellationTokenLike): Promise<unknown[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendReferencesRequest(ws, uri, position, context);
+      return sendReferencesRequest(ws, uri, position, context, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request prepare rename
   const requestPrepareRename = useCallback(
-    (uri: string, position: { line: number; character: number }): Promise<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string } | null> => {
+    (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike): Promise<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string } | null> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve(null);
       }
-      return sendPrepareRenameRequest(ws, uri, position);
+      return sendPrepareRenameRequest(ws, uri, position, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request rename
   const requestRename = useCallback(
-    (uri: string, position: { line: number; character: number }, newName: string): Promise<unknown> => {
+    (uri: string, position: { line: number; character: number }, newName: string, token?: CancellationTokenLike): Promise<unknown> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve(null);
       }
-      return sendRenameRequest(ws, uri, position, newName);
+      return sendRenameRequest(ws, uri, position, newName, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request signature help
   const requestSignatureHelp = useCallback(
-    (uri: string, position: { line: number; character: number }): Promise<unknown | null> => {
+    (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike): Promise<unknown | null> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve(null);
       }
-      return sendSignatureHelpRequest(ws, uri, position);
+      return sendSignatureHelpRequest(ws, uri, position, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request document formatting
   const requestFormatting = useCallback(
-    (uri: string): Promise<unknown[]> => {
+    (uri: string, token?: CancellationTokenLike): Promise<unknown[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendFormattingRequest(ws, uri);
+      return sendFormattingRequest(ws, uri, token);
     },
     [wsRef, isInitialized]
   );
@@ -163,37 +163,38 @@ export function useLSPRequests({
     (
       uri: string,
       range: { start: { line: number; character: number }; end: { line: number; character: number } },
-      context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number }> }
+      context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number }> },
+      token?: CancellationTokenLike
     ): Promise<CodeAction[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendCodeActionRequest(ws, uri, range, context);
+      return sendCodeActionRequest(ws, uri, range, context, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request document symbols
   const requestDocumentSymbols = useCallback(
-    (uri: string): Promise<DocumentSymbol[]> => {
+    (uri: string, token?: CancellationTokenLike): Promise<DocumentSymbol[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendDocumentSymbolsRequest(ws, uri);
+      return sendDocumentSymbolsRequest(ws, uri, token);
     },
     [wsRef, isInitialized]
   );
 
   // Request document highlight
   const requestDocumentHighlight = useCallback(
-    (uri: string, position: { line: number; character: number }): Promise<DocumentHighlight[]> => {
+    (uri: string, position: { line: number; character: number }, token?: CancellationTokenLike): Promise<DocumentHighlight[]> => {
       const ws = wsRef.current;
       if (!ws || !isInitialized) {
         return Promise.resolve([]);
       }
-      return sendDocumentHighlightRequest(ws, uri, position);
+      return sendDocumentHighlightRequest(ws, uri, position, token);
     },
     [wsRef, isInitialized]
   );

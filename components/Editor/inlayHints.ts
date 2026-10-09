@@ -3,7 +3,7 @@
  * Handles caching, throttling, and conversion of LSP inlay hints
  */
 
-import type { editor } from "monaco-editor";
+import type { editor, CancellationToken } from "monaco-editor";
 import type { MonacoType, InlayHint, InlayHintsCache } from "./types";
 import { HINTS_CACHE_TTL } from "./constants";
 
@@ -80,7 +80,8 @@ export function registerInlayHintsProvider(
   const provider = monaco.languages.registerInlayHintsProvider("rust", {
     provideInlayHints: async (
       model: editor.ITextModel,
-      range: { startLineNumber: number; endLineNumber: number }
+      range: { startLineNumber: number; endLineNumber: number },
+      token: CancellationToken
     ) => {
       // Get fresh function reference from window
       const lspFn = window.lspFunctions;
@@ -143,7 +144,7 @@ export function registerInlayHintsProvider(
         pendingHintsRequest = lspFn.requestInlayHints(uri, {
           startLine,
           endLine,
-        });
+        }, token);
 
         const hints = await pendingHintsRequest;
         pendingHintsRequest = null;

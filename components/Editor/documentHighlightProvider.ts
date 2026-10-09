@@ -11,7 +11,8 @@ import type { MonacoType } from "./types";
  */
 async function requestDocumentHighlight(
   uri: string,
-  position: { line: number; character: number }
+  position: { line: number; character: number },
+  token?: CancellationToken
 ): Promise<DocumentHighlight[]> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestDocumentHighlight) {
@@ -19,7 +20,7 @@ async function requestDocumentHighlight(
   }
 
   try {
-    const result = await lspFn.requestDocumentHighlight(uri, position);
+    const result = await lspFn.requestDocumentHighlight(uri, position, token);
     return result as DocumentHighlight[];
   } catch (error) {
     console.error("[DocumentHighlight] Error:", error);
@@ -68,7 +69,7 @@ export function registerDocumentHighlightProvider(
     provideDocumentHighlights: async (
       model: editor.ITextModel,
       position: Position,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.DocumentHighlight[] | null> => {
       const uri = model.uri.toString();
 
@@ -78,7 +79,7 @@ export function registerDocumentHighlightProvider(
         character: position.column - 1,
       };
 
-      const highlights = await requestDocumentHighlight(uri, lspPosition);
+      const highlights = await requestDocumentHighlight(uri, lspPosition, token);
 
       if (!highlights || highlights.length === 0) {
         return null;

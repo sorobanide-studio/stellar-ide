@@ -12,7 +12,8 @@ import type { MonacoType } from "./types";
 async function requestReferencesInfo(
   uri: string,
   position: { line: number; character: number },
-  includeDeclaration: boolean = true
+  includeDeclaration: boolean = true,
+  token?: CancellationToken
 ): Promise<LocationResult[]> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestReferences) {
@@ -22,7 +23,7 @@ async function requestReferencesInfo(
   try {
     const result = await lspFn.requestReferences(uri, position, {
       includeDeclaration,
-    });
+    }, token);
     // LSP returns Location[]
     if (!result) return [];
     return Array.isArray(result) ? result : [];
@@ -82,7 +83,7 @@ export function registerReferenceProvider(
       model: editor.ITextModel,
       position: Position,
       context: languages.ReferenceContext,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.Location[] | null> => {
       const uri = model.uri.toString();
 
@@ -98,7 +99,8 @@ export function registerReferenceProvider(
       const locations = await requestReferencesInfo(
         uri,
         lspPosition,
-        includeDeclaration
+        includeDeclaration,
+        token
       );
 
       if (locations.length === 0) {

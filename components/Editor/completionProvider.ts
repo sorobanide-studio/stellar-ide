@@ -11,7 +11,8 @@ import type { MonacoType } from "./types";
  */
 async function requestCompletion(
   uri: string,
-  position: { line: number; character: number }
+  position: { line: number; character: number },
+  token?: CancellationToken
 ): Promise<CompletionItem[]> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestCompletion) {
@@ -19,7 +20,7 @@ async function requestCompletion(
   }
 
   try {
-    const items = await lspFn.requestCompletion(uri, position);
+    const items = await lspFn.requestCompletion(uri, position, token);
     return items as CompletionItem[];
   } catch (error) {
     console.error("[Completion] Error:", error);
@@ -115,7 +116,7 @@ export function registerCompletionProvider(
       model: editor.ITextModel,
       position: Position,
       _context: languages.CompletionContext,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.CompletionList> => {
       const uri = model.uri.toString();
 
@@ -125,7 +126,7 @@ export function registerCompletionProvider(
         character: position.column - 1,
       };
 
-      const items = await requestCompletion(uri, lspPosition);
+      const items = await requestCompletion(uri, lspPosition, token);
 
       if (items.length === 0) {
         return { suggestions: [] };

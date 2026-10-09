@@ -11,7 +11,8 @@ import type { MonacoType } from "./types";
  */
 async function requestHoverInfo(
   uri: string,
-  position: { line: number; character: number }
+  position: { line: number; character: number },
+  token?: CancellationToken
 ): Promise<HoverResult | null> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestHover) {
@@ -19,7 +20,7 @@ async function requestHoverInfo(
   }
 
   try {
-    const result = await lspFn.requestHover(uri, position);
+    const result = await lspFn.requestHover(uri, position, token);
     return result as HoverResult | null;
   } catch (error) {
     console.error("[Hover] Error:", error);
@@ -83,7 +84,7 @@ export function registerHoverProvider(
     provideHover: async (
       model: editor.ITextModel,
       position: Position,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.Hover | null> => {
       const uri = model.uri.toString();
 
@@ -93,7 +94,7 @@ export function registerHoverProvider(
         character: position.column - 1,
       };
 
-      const hover = await requestHoverInfo(uri, lspPosition);
+      const hover = await requestHoverInfo(uri, lspPosition, token);
 
       if (!hover) {
         return null;
