@@ -13,6 +13,7 @@ import type {
   LSPFunctionsRef,
 } from "./types";
 import { getLanguageFromFilename, getEditorOptions } from "./constants";
+import { PROVIDER_REGISTRATIONS } from "./providerCapabilities";
 import { useEditorZoom } from "./useEditorZoom";
 import {
   registerLanguageProviders,
@@ -107,6 +108,26 @@ export default function MonacoEditorWrapper({
 
       // Register each language provider exactly once per Monaco instance.
       registerLanguageProviders(monaco);
+      // Store LSP functions for providers
+      window.lspFunctions = {
+        requestInlayHints,
+        requestCompletion,
+        requestHover,
+        requestDefinition,
+        requestReferences,
+        requestPrepareRename,
+        requestRename,
+        requestFormatting,
+        requestCodeAction,
+        requestDocumentSymbols,
+        requestDocumentHighlight,
+      };
+
+      // Register language providers from the shared capability registry
+      // (only once each) so providers and LSP_CAPABILITIES stay in lockstep.
+      for (const { register } of PROVIDER_REGISTRATIONS) {
+        register(monaco);
+      }
 
       // Add wheel zoom handler
       if (containerRef.current) {
