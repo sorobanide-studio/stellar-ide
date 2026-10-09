@@ -171,7 +171,7 @@ If you change the tag (`stellar-sandbox:v1` → something else), update `lib/doc
 6. **Build and Deploy**
    - Use the **"Build"** button to compile your contract
    - View build output in the **Terminal** panel
-   - Once successful, click **"Deploy"** to deploy to the Stellar network
+   - Once successful, click **"Deploy"** to deploy to the Stellar testnet
    - Confirm the transaction in your Freighter wallet
 
 ## User Guide
@@ -375,17 +375,31 @@ Located on the left side of the editor panel:
 
 #### Deployment Steps
 
-1. Click the **"Deploy"** button in the top bar
-2. A deployment dialog will appear showing:
-   - Network selection (Testnet/Mainnet)
-   - Contract details
-   - Estimated fees
-3. Review and confirm the deployment details
-4. Click **"Confirm Deployment"**
-5. Approve the transaction in your Freighter wallet
-6. Wait for confirmation (usually 5-30 seconds)
-7. View deployment logs in the Terminal panel
-8. The contract address will be displayed upon success
+Clicking **"Deploy"** runs `deployWithWallet` in `lib/wallet-deploy.ts`. There is no deployment
+dialog and no network selector:
+
+1. **Build** - The contract is built first, through the same `buildContract` API call as the Build
+   button. The terminal logs `Building contract...` and then `Contract built (<size> KB)`.
+2. **Wallet connection** - Freighter is checked with `isConnected()`/`getAddress()`. If access has
+   not already been granted, Freighter shows an access prompt and the terminal logs
+   `Requesting wallet access...`.
+3. **Upload the WASM (Freighter popup #1)** - The terminal logs
+   `Sign WASM upload in wallet popup...`; approving signs and submits an `uploadContractWasm`
+   transaction. The terminal then prints `Upload TX: <hash>` with a `stellar.expert` explorer link.
+4. **Wait for the upload (up to 60 s)** - The code polls `getTransaction` once per second, up to
+   **60 attempts**, logging `Waiting... (10s)` every ten seconds, then logs the uploaded WASM hash.
+5. **Create the contract (Freighter popup #2)** - The terminal logs
+   `Sign contract creation in wallet popup...`; approving signs and submits a `createCustomContract`
+   transaction, then prints `Deploy TX: <hash>` with another explorer link.
+6. **Wait for the deploy (up to 60 s)** - The same one-second, 60-attempt polling loop runs, logging
+   `Waiting for confirmation... (10s)` periodically.
+7. **Result** - On success the terminal prints `Contract Deployed Successfully!`, the contract ID,
+   and two explorer links (`stellar.expert` and `lab.stellar.org`). On failure or timeout the error is
+   printed in the same Terminal panel.
+
+**Network:** testnet only. `lib/wallet-deploy.ts` hardcodes the RPC URL
+(`https://soroban-testnet.stellar.org`) and the passphrase (`Test SDF Network ; September 2015`).
+There is no Mainnet path and no fee estimate, so deploying elsewhere currently requires a code change.
 
 ### Wallet Integration
 
@@ -400,13 +414,12 @@ Located on the left side of the editor panel:
 
 - **Address**: Truncated wallet address with copy button
 - **Balance**: Current XLM balance in the wallet
-- **Network**: Current Stellar network (Testnet/Mainnet)
+- **Network**: Stellar testnet - the RPC endpoint and passphrase are hardcoded (see [Deploying Contracts](#deploying-contracts))
 
 #### Managing Wallet
 
 - Click on wallet address to copy it to clipboard
 - Click the wallet icon to view full address and options
-- Use the network selector to switch between Testnet and Mainnet
 
 ### Terminal and Logging
 
