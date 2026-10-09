@@ -130,8 +130,11 @@ export default function EditorPanel({
     (editor: MonacoEditor, monaco: MonacoType) => {
       editorInstanceRef.current = editor;
 
-      // Store editor instance globally for OutlineView navigation
+      // Store editor instance globally for OutlineView navigation.
+      // Temporary allowlist: this global is frozen until the editor state moves
+      // into React context (the window-globals follow-up).
       if (typeof window !== "undefined") {
+        // eslint-disable-next-line no-restricted-syntax -- editor state still lives on window; follow-up moves it to React context.
         window.currentEditorInstance = editor;
       }
 
