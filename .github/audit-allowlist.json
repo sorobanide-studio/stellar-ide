@@ -1,0 +1,4 @@
+{
+  "$comment": "Advisories with no upstream fix. Each entry is suppressed only until its `expires` date (YYYY-MM-DD, inclusive); after that date the audit job fails again, so an entry cannot live forever. `id` matches the advisory source id (the npm source number or a GHSA url containing it) and the optional `package` field narrows the suppression to one dependency. Delete an entry as soon as a fixed release is available.",
+  "allow": []
+}
