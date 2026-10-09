@@ -58,7 +58,7 @@ switch (action) {
     return NextResponse.json(saveResult);
 
   case 'createFile':
-    const createFileResult = await createFile(walletAddress, filePath, '', projectName);
+    const createFileResult = await createFile(walletAddress, filePath, content ?? '', projectName);
     return NextResponse.json(createFileResult);
 
   case 'createFolder':
