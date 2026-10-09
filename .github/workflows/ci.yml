@@ -21,6 +21,7 @@ jobs:
       run: npm ci
     - name: Lint
       run: npm run lint
+    timeout-minutes: 10
   type-check:
     name: type-check
     runs-on: ubuntu-latest
@@ -35,6 +36,7 @@ jobs:
       run: npm ci
     - name: Type check
       run: npx tsc --noEmit
+    timeout-minutes: 10
   build:
     name: build
     runs-on: ubuntu-latest
@@ -50,6 +52,7 @@ jobs:
     - name: Build
       run: npm run build
     needs: type-check
+    timeout-minutes: 20
   test:
     name: test
     runs-on: ubuntu-latest
@@ -64,6 +67,7 @@ jobs:
       run: npm ci
     - name: Test
       run: npm test
+    timeout-minutes: 20
   ci-success:
     name: ci-success
     runs-on: ubuntu-latest
