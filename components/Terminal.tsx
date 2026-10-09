@@ -160,6 +160,8 @@ export default function Terminal({
       {/* Terminal Content */}
       <div
         ref={terminalRef}
+        role="log"
+        aria-label="Console output"
         className="flex-1 overflow-y-auto bg-[#171717] font-mono text-sm p-4 space-y-1 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-[#171717]"
         style={{
           scrollbarWidth: "thin",
