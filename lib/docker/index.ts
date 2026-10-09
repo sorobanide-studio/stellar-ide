@@ -18,6 +18,7 @@ export {
   escapeFilePath,
   getContainerName,
   isValidStellarAddress,
+  getIdentityName,
   getProjectPath,
   getWorkspacePath,
   getWorkspaceVolumeName,
