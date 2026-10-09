@@ -29,6 +29,9 @@ try {
 const { action, walletAddress, filePath, content, publicKey, projectName, description, oldName, newName, removeVolume } = await request.json();
 
 // Validate wallet address is provided
+// A wallet address is required for every action, including checkHealth:
+// getContainerName validates it and would otherwise throw inside the handler
+// and be turned into a 500 (with `details`) instead of a 400.
 if (!walletAddress) {
   return NextResponse.json(
     { error: 'Wallet address is required' },
