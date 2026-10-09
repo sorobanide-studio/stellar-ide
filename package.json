@@ -6,7 +6,7 @@
     "dev": "next dev --experimental-https",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings 0 app components context hooks lib tests",
     "test": "vitest run"
   },
   "dependencies": {
