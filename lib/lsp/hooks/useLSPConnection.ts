@@ -19,6 +19,57 @@ interface UseLSPConnectionReturn {
   wsRef: React.RefObject<WebSocket | null>;
 }
 
+/** Minimal shape of the socket ref so the guard helpers are easy to test. */
+export interface SocketRef {
+  current: WebSocket | null;
+}
+
+/**
+ * True only while `socket` is still the socket currently stored in `wsRef`.
+ *
+ * A socket's handlers can fire after React has already run the effect cleanup
+ * and installed a newer socket (the classic `containerId` switch race), so
+ * every handler checks this before mutating shared state.
+ *
+ * Exported for testability.
+ */
+export function isActiveSocket(wsRef: SocketRef, socket: WebSocket): boolean {
+  return wsRef.current === socket;
+}
+
+export interface SocketCloseDeps {
+  wsRef: SocketRef;
+  socket: WebSocket;
+  setIsConnected: (value: boolean) => void;
+  setIsInitialized: (value: boolean) => void;
+  isInitializedRef: { current: boolean };
+}
+
+/**
+ * Handle a socket close exactly once and only for the socket that is still
+ * active. A late `onclose` from a previous connection returns `false` and
+ * leaves the new connection's state untouched.
+ *
+ * Exported for testability.
+ */
+export function handleSocketClose({
+  wsRef,
+  socket,
+  setIsConnected,
+  setIsInitialized,
+  isInitializedRef,
+}: SocketCloseDeps): boolean {
+  if (!isActiveSocket(wsRef, socket)) {
+    return false;
+  }
+
+  wsRef.current = null;
+  isInitializedRef.current = false;
+  setIsConnected(false);
+  setIsInitialized(false);
+  return true;
+}
+
 /**
  * Hook to manage LSP WebSocket connection
  */
@@ -32,7 +83,7 @@ export function useLSPConnection({
   const wsRef = useRef<WebSocket | null>(null);
   const isInitializedRef = useRef(false);
   const onDiagnosticsRef = useRef(onDiagnostics);
-  
+
   // Update ref when callback changes (but don't trigger reconnection)
   useEffect(() => {
     onDiagnosticsRef.current = onDiagnostics;
@@ -56,11 +107,20 @@ export function useLSPConnection({
 
     console.log(`[LSP Connection] Connecting to container: ${containerId}`);
 
+    // Reset connection state explicitly for the new socket instead of relying
+    // on the previous socket's (possibly detached) onclose callback.
+    setIsConnected(false);
+    setIsInitialized(false);
+    setConnectionError(null);
+    isInitializedRef.current = false;
+
     const wsUrl = `ws://localhost:3001?containerId=${containerId}&workspace=/home/developer/workspace`;
     const socket = new WebSocket(wsUrl);
     wsRef.current = socket;
 
     socket.onopen = () => {
+      if (!isActiveSocket(wsRef, socket)) return;
+
       console.log('[LSP Connection] ✓ WebSocket connected');
       setConnectionError(null);
       setIsConnected(true);
@@ -72,6 +132,8 @@ export function useLSPConnection({
     };
 
     socket.onmessage = (event) => {
+      if (!isActiveSocket(wsRef, socket)) return;
+
       try {
         const message = JSON.parse(event.data);
 
@@ -97,24 +159,48 @@ export function useLSPConnection({
     };
 
     socket.onerror = (error) => {
+      if (!isActiveSocket(wsRef, socket)) return;
+
       console.error('[LSP Connection] WebSocket error:', error);
       setConnectionError('WebSocket connection error');
     };
 
     socket.onclose = (event) => {
+      // A late close from a socket that has already been replaced must not
+      // tear down the live connection.
+      if (!isActiveSocket(wsRef, socket)) {
+        console.log('[LSP Connection] Ignoring close from stale socket');
+        return;
+      }
+
       console.log(`[LSP Connection] WebSocket closed (code: ${event.code})`);
-      setIsConnected(false);
-      isInitializedRef.current = false;
-      setIsInitialized(false);
-      wsRef.current = null;
+      handleSocketClose({
+        wsRef,
+        socket,
+        setIsConnected,
+        setIsInitialized,
+        isInitializedRef,
+      });
     };
 
     return () => {
       console.log('[LSP Connection] Cleanup: closing connection');
+
+      // Detach handlers before closing so this socket's onclose cannot fire
+      // after the next effect has installed the new socket.
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+
       if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
         socket.close();
       }
-      wsRef.current = null;
+
+      if (wsRef.current === socket) {
+        wsRef.current = null;
+        setIsConnected(false);
+      }
       isInitializedRef.current = false;
       setIsInitialized(false);
     };
