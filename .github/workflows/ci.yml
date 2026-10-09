@@ -71,17 +71,15 @@ jobs:
     - type-check
     - build
     - test
-    - changes
-    - docker-image
+    - shellcheck
     if: always()
     steps:
     - name: Fail if any required job did not succeed
       env:
         NEEDS: ${{ toJSON(needs) }}
-      run: "echo \"$NEEDS\"\nbad=$(echo \"$NEEDS\" | jq -r 'to_entries[] | select((((.value.result\
-        \ == \"success\") or (.key == \"docker-image\" and .value.result == \"skipped\"\
-        ))) | not) | .key')\nif [ -n \"$bad\" ]; then\n  echo \"::error::These jobs\
-        \ did not succeed: $bad\"\n  exit 1\nfi\necho \"All required jobs succeeded.\"\
+      run: "echo \"$NEEDS\"\nbad=$(echo \"$NEEDS\" | jq -r 'to_entries[] | select(((.value.result\
+        \ == \"success\")) | not) | .key')\nif [ -n \"$bad\" ]; then\n  echo \"::error::These\
+        \ jobs did not succeed: $bad\"\n  exit 1\nfi\necho \"All required jobs succeeded.\"\
         \n"
   docker-image:
     name: docker-image
@@ -172,5 +170,22 @@ jobs:
       with:
         filters: "docker:\n  - \"Dockerfile\"\n  - \"rust-toolchain.toml\"\n  - \"\
           .github/workflows/ci.yml\"\n"
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Ensure shellcheck is available
+      run: "if ! command -v shellcheck >/dev/null 2>&1; then\n  sudo apt-get update\n\
+        \  sudo apt-get install -y shellcheck\nfi\nshellcheck --version\n"
+    - name: Lint the extracted shell fragments
+      run: shellcheck --severity=warning scripts/*.sh
+    - name: Lint the Dockerfile RUN commands
+      run: "awk '\n  /^[[:space:]]*RUN([[:space:]]|$)/ {\n    sub(/^[[:space:]]*RUN[[:space:]]*/,\
+        \ \"\")\n    printf \"%s\", $0\n    while ($0 ~ /\\\\$/) { getline; printf\
+        \ \"\\n%s\", $0 }\n    print \"\"\n    next\n  }\n' Dockerfile > /tmp/dockerfile-runs.sh\n\
+        echo \"--- Dockerfile RUN bodies extracted for shellcheck ---\"\ncat /tmp/dockerfile-runs.sh\n\
+        shellcheck --severity=warning --shell=sh /tmp/dockerfile-runs.sh\n"
 permissions:
   contents: read

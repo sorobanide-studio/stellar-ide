@@ -8,6 +8,7 @@ import {
   getContainerName,
   getWorkspacePath,
   escapeFilePath,
+  scriptCommand,
 } from '../utils';
 import {
   buildFindByNameCommand,
@@ -43,6 +44,7 @@ export async function saveFileContent(walletAddress: string, filePath: string, c
     // First verify the file exists (as `developer`)
     const { stdout: fileCheck } = await execAsync(
       buildTestFileCommand(containerName, fullPath)
+      scriptCommand('path-exists.sh', containerName, 'f', fullPath)
     );
 
     if (fileCheck.trim() === 'missing') {
@@ -71,6 +73,7 @@ export async function saveFileContent(walletAddress: string, filePath: string, c
     // it is missing and truncates it when it exists.
     await execAsync(
       buildWriteFileCommand(containerName, fullPath, base64Content),
+      scriptCommand('write-file-content.sh', containerName, fullPath, base64Content),
       { timeout: 10000 }
     );
 
@@ -116,6 +119,9 @@ export async function createFile(walletAddress: string, filePath: string, conten
     if (content) {
       const base64Content = Buffer.from(content).toString('base64');
       await execAsync(buildWriteFileCommand(containerName, fullPath, base64Content));
+      await execAsync(
+        scriptCommand('write-file-content.sh', containerName, fullPath, base64Content)
+      );
     } else {
       await execAsync(buildTouchFileCommand(containerName, fullPath));
     }
