@@ -6,8 +6,28 @@
 import { Diagnostic, MonacoMarker, WindowWithMonaco, MonacoModel } from './types';
 
 /**
+ * Mapping from LSP DiagnosticSeverity to Monaco MarkerSeverity:
+ *
+ *   LSP  1 Error        -> Monaco 8 Error
+ *   LSP  2 Warning      -> Monaco 4 Warning
+ *   LSP  3 Information  -> Monaco 2 Info
+ *   LSP  4 Hint         -> Monaco 1 Hint
+ *
+ * A diagnostic that omits `severity` uses the LSP default of 1 (Error), which
+ * is Monaco 8.
+ */
+const LSP_SEVERITY_TO_MONACO: Record<number, number> = {
+  1: 8, // Error
+  2: 4, // Warning
+  3: 2, // Information
+  4: 1, // Hint
+};
+
+const DEFAULT_MONACO_SEVERITY = 8;
+
+/**
  * Convert LSP diagnostics to Monaco markers
- * LSP severity: 1=Error, 2=Warning, 3=Info, 4=Hint
+ * LSP severity: 1=Error, 2=Warning, 3=Information, 4=Hint
  * Monaco severity: 8=Error, 4=Warning, 2=Info, 1=Hint
  */
 export function convertToMonacoMarkers(diagnostics: Diagnostic[]): MonacoMarker[] {
@@ -17,7 +37,7 @@ export function convertToMonacoMarkers(diagnostics: Diagnostic[]): MonacoMarker[
     endLineNumber: diag.range.end.line + 1,
     endColumn: diag.range.end.character + 1,
     message: diag.message,
-    severity: diag.severity === 1 ? 8 : diag.severity === 2 ? 4 : 2,
+    severity: LSP_SEVERITY_TO_MONACO[diag.severity] ?? DEFAULT_MONACO_SEVERITY,
   }));
 }
 
