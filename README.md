@@ -56,21 +56,19 @@ The screenshot above shows the main editor interface with the code editor, file 
    npm install
    ```
 
-3. **Set up environment variables** (if needed)
-
-   ```bash
-   # Create a .env.local file for any required configuration
-   ```
-
-4. **Start the development server**
+3. **Start the development server**
 
    ```bash
    npm run dev
    ```
 
-5. **Open in browser**
+4. **Open in browser**
    - Navigate to `https://localhost:3000`
    - The application uses experimental HTTPS for wallet integration
+
+### Configuration
+
+This version reads **no environment variables**: there is no `process.env` access in `app/`, `lib/` or `hooks/`, and no `.env.local` file is required or read. The Soroban RPC endpoint (`https://soroban-testnet.stellar.org`) and the network passphrase (`Test SDF Network ; September 2015`) are hardcoded constants in `lib/wallet-deploy.ts`, so targeting Mainnet or a private RPC currently needs a code change. `.gitignore` already excludes `.env`, `.env.local` and the other `.env*` variants if configuration is added later.
 
 
 ## Docker Image
@@ -373,6 +371,7 @@ Located on the left side of the editor panel:
 1. **Wallet Connected** - Connect your Freighter wallet
 2. **Build Successful** - Build your contract without errors
 3. **Funded Wallet** - Have at least 1 XLM for transaction fees
+4. **Testnet only** - The RPC endpoint and network passphrase are hardcoded to Stellar testnet in `lib/wallet-deploy.ts`; there is no Mainnet configuration.
 
 #### Deployment Steps
 
