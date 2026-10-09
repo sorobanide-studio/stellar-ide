@@ -187,7 +187,7 @@ The editor interface is divided into four main sections:
 │          Top Bar (Menu & Wallet)        │
 ├────────────────────────────────────────┤
 │ Left Panel │      Editor Panel      │   │
-│  (Chat)    │    (Code Editor)       │   │
+│  (Files)   │    (Code Editor)       │   │
 │           │      Main Area          │   │
 ├────────────────────────────────────────┤
 │        Terminal/Output Panel            │
@@ -209,21 +209,9 @@ The editor interface is divided into four main sections:
 - **Build** button - Compile your contract
 - **Deploy** button - Deploy to Stellar network
 
-### Left Panel
+### Left Panel (File Explorer)
 
-The **Chat/Assistant Panel** provides:
-
-- AI-powered development assistance
-- Code suggestions and explanations
-- Real-time feedback on your code
-- Message history with previous interactions
-
-**How to use:**
-
-1. Type your question or request in the text area at the bottom
-2. Press **Enter** or click **Send**
-3. View the AI response and any suggested actions
-4. Click on suggested actions to implement recommendations
+The left panel is the sidebar (`components/Sidebar/index.tsx`): the project file tree (`components/Sidebar/FileTree.tsx`) and, when a Rust file is open, an outline of that file's symbols (`components/Sidebar/OutlineSection.tsx`). See [File Explorer (Sidebar)](#file-explorer-sidebar) below for the operations it supports.
 
 ### File Explorer (Sidebar)
 
