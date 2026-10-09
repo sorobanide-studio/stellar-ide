@@ -9,6 +9,8 @@ import {
   getContainerName,
   getIdentityName,
   getWorkspacePath,
+  getWasmRelativePath,
+  resolveProjectDirectory,
 } from './utils';
 
 /**
@@ -35,6 +37,17 @@ export async function deployContract(userId: string, publicKey?: string, project
       : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`;
       ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`
       : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`;
+    const projectDir = resolveProjectDirectory(projectName);
+
+    console.log(`Deploying contract in container: ${containerName}, project: ${projectName || 'default'}`);
+
+    // Build the deployment command with optional publicKey parameter
+    // Note: --source-account is always required (the account that pays for deployment)
+    // --sign-with-key is optional (the key used to sign the transaction)
+    // The --wasm path is derived from the project name so it matches the artifact
+    // the build above actually produced.
+    const wasmRelativePath = getWasmRelativePath(projectName);
+    const deployCmd = `stellar contract deploy --wasm ${wasmRelativePath} --source-account darshan --network testnet --alias hello_world`;
 
     const { stdout, stderr } = await execAsync(
       `docker exec -u developer -w ${projectDir} ${containerName} sh -c "stellar contract build && cargo build --target wasm32v1-none --release && ${deployCmd}"`,
@@ -131,6 +144,12 @@ export async function buildAndDeploy(userId: string, publicKey?: string, project
       : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account darshan --network testnet --alias hello_world`;
       ? `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`
       : `stellar contract deploy --wasm target/wasm32v1-none/release/hello_world.wasm --source-account ${identity} --network testnet --alias hello_world`;
+    const projectDir = resolveProjectDirectory(projectName);
+
+    console.log(`Building and deploying contract in container: ${containerName}, project: ${projectName || 'default'}`);
+
+    const wasmRelativePath = getWasmRelativePath(projectName);
+    const deployCmd = `stellar contract deploy --wasm ${wasmRelativePath} --source-account darshan --network testnet --alias hello_world`;
 
     const { stdout, stderr } = await execAsync(
       `docker exec -u developer -w ${projectDir} ${containerName} sh -c "set -e; echo 'Starting build...'; stellar contract build; echo 'Building WASM...'; cargo build --target wasm32v1-none --release; echo 'Deploying...'; ${deployCmd}"`,
