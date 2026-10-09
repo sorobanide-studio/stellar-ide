@@ -249,7 +249,12 @@ export async function deployWithWallet(
     // browser session — using crypto.getRandomValues guarantees an
     // attacker-uninfluenceable contract address.
     const saltBuffer = generateDeploymentSalt();
-    
+    if (saltBuffer.length !== 32) {
+      throw new Error(
+        `Refusing to deploy: deployment salt must be exactly 32 bytes, got ${saltBuffer.length}`
+      );
+    }
+
     const createTx = new StellarSdk.TransactionBuilder(freshAccount, {
       fee: StellarSdk.BASE_FEE,
       networkPassphrase: NETWORK_PASSPHRASE,
