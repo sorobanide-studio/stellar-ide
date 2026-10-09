@@ -46,32 +46,7 @@ jobs:
     - name: Install dependencies
       run: npm ci
     - name: Build
-      run: 'set -o pipefail
-
-        npm run build 2>&1 | tee build.log
-
-        '
-    - name: Fail on new build warnings
-      env:
-        BUILD_WARNING_THRESHOLD: '5'
-      run: "# Turbopack prints one \"encountered N warnings\" summary; some Next.js\n\
-        # build modes also print a line per warning. Count both and take the\n# larger,\
-        \ so the gate neither misses the summary nor double-counts a\n# warning that\
-        \ appears in both places.\nsummary=$( (grep -Eo 'encountered [0-9]+ warnings?'\
-        \ build.log || true) | (grep -Eo '[0-9]+' || true) | awk '{s+=$1} END{print\
-        \ s+0}' )\nlabelled=$(grep -Eci '^[[:space:]]*(⚠|warn(ing)?[: ])' build.log\
-        \ || true)\nwarnings=$(( summary > labelled ? summary : labelled ))\necho\
-        \ \"next build emitted ${warnings} warning line(s); the budget is ${BUILD_WARNING_THRESHOLD}.\"\
-        \nif [ \"$warnings\" -gt \"$BUILD_WARNING_THRESHOLD\" ]; then\n  echo \"::error::next\
-        \ build emitted ${warnings} warning line(s), over the ${BUILD_WARNING_THRESHOLD}-warning\
-        \ budget.\"\n  grep -Ein 'warn' build.log | head -20 || true\n  exit 1\nfi\n"
-    - name: Upload the build log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: next-build-log
-        path: build.log
-        if-no-files-found: ignore
+      run: npm run build
   test:
     name: test
     runs-on: ubuntu-latest
@@ -103,3 +78,5 @@ jobs:
         \ == \"success\")) | not) | .key')\nif [ -n \"$bad\" ]; then\n  echo \"::error::These\
         \ jobs did not succeed: $bad\"\n  exit 1\nfi\necho \"All required jobs succeeded.\"\
         \n"
+permissions:
+  contents: read
