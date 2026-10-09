@@ -29,11 +29,40 @@ export function escapeFilePath(path: string): string {
 }
 
 /**
+ * Matches a Stellar ed25519 public key (StrKey): 56 base32 characters starting
+ * with `G`. Equivalent to `StrKey.isValidEd25519PublicKey`.
+ */
+export const STELLAR_PUBLIC_KEY_REGEX = /^G[A-Z2-7]{55}$/;
+
+/**
+ * Validate a Stellar public key.
+ * @param walletAddress Value to check
+ * @returns true when it is a well-formed Stellar ed25519 public key
+ */
+export function isValidStellarAddress(walletAddress: unknown): walletAddress is string {
+  return (
+    typeof walletAddress === 'string' &&
+    STELLAR_PUBLIC_KEY_REGEX.test(walletAddress)
+  );
+}
+
+/**
  * Get container name from wallet address (public key)
  * @param walletAddress The Stellar wallet public key
  * @returns Formatted container name
+ * @throws Error when the address is not a valid Stellar public key
  */
 export function getContainerName(walletAddress: string): string {
+  // The value is interpolated into `docker run --name soroban-<prefix>`,
+  // `docker exec ${containerName}` and `docker rm -f ${containerName}`, so a
+  // caller-supplied address containing shell metacharacters (e.g.
+  // `abc; rm -rf /`) must be rejected before any command is built.
+  if (!isValidStellarAddress(walletAddress)) {
+    throw new Error(
+      'Invalid wallet address: expected a Stellar ed25519 public key (56 base32 characters starting with G)'
+    );
+  }
+
   // Use first 10 characters of wallet address and convert to lowercase
   // Format: soroban-GBUQWP3K... -> soroban-gbuqwp3k
   const prefix = walletAddress.slice(0, 10).toLowerCase();
