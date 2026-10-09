@@ -11,6 +11,20 @@ import {
 } from './utils';
 
 /**
+ * Decode a base64 WASM payload and return its real size in bytes.
+ *
+ * `wasmBase64.length` is the length of the base64 *string*, roughly 4/3 of the
+ * artifact size plus padding, so reporting it made `wallet-deploy.ts` print a
+ * size about a third larger than the WASM actually uploaded.
+ *
+ * @param wasmBase64 Base64-encoded WASM bytes (may contain newlines)
+ * @returns Decoded byte length
+ */
+export function decodeWasmSize(wasmBase64: string): number {
+  return Buffer.from(wasmBase64, 'base64').length;
+}
+
+/**
  * Build a Soroban contract
  * @param userId The user ID
  * @param projectName The project name
@@ -87,7 +101,9 @@ export async function buildContract(userId: string, projectName?: string) {
     return {
       success: true,
       wasmBase64: wasmBase64.trim(),
-      wasmSize: wasmBase64.length,
+      // wasmSize is the decoded byte length of the artifact (not the base64
+      // string length); callers convert it to KB for display.
+      wasmSize: decodeWasmSize(wasmBase64),
       buildOutput: 'Build completed successfully',
     };
   } catch (error: any) {
