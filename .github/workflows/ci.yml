@@ -76,7 +76,7 @@ jobs:
     - type-check
     - build
     - test
-    - secret-scan
+    - audit
     if: always()
     steps:
     - name: Fail if any required job did not succeed
