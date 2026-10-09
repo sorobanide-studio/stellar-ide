@@ -48,6 +48,15 @@ export function createRequestId(): number {
  * timer cleared and a `$/cancelRequest` notification naming `requestId` is sent
  * to rust-analyzer before the promise resolves with `defaultValue`. A late
  * result therefore can never resolve the promise and overwrite a newer one.
+ * Resolve a single JSON-RPC response for `requestId`.
+ *
+ * Every request helper in this folder used to attach its own `message`
+ * listener and only ever look at `message.result`, so a JSON-RPC error response
+ * (`{ id, error: { code, message } }`) was silently ignored and the caller
+ * waited out the whole timeout before receiving an empty result. This helper
+ * centralises that listener so a new request cannot forget the error branch:
+ * an error response resolves immediately with `defaultValue`, logging the
+ * server's code and message exactly once.
  */
 export function awaitResponse<T>(
   ws: WebSocket,
@@ -61,6 +70,9 @@ export function awaitResponse<T>(
   return new Promise<T>((resolve) => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let settled = false;
 
     function finish(value: T) {
       if (settled) {
@@ -87,6 +99,7 @@ export function awaitResponse<T>(
       }
       settled = true;
       cleanup();
+      ws.removeEventListener('message', handleMessage);
       resolve(value);
     }
 
@@ -142,6 +155,7 @@ export function awaitResponse<T>(
         finish(defaultValue);
       });
     }
+    setTimeout(() => finish(defaultValue), timeout);
   });
 }
 
