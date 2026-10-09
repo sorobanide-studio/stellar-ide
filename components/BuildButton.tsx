@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Zap } from "lucide-react";
+import { sanitizeAnnouncement } from "../lib/a11y";
 
 interface BuildButtonProps {
   onLog: (message: string, type: "log" | "error" | "warn" | "info") => void;
@@ -76,18 +77,22 @@ function formatRustOutput(
 
 export function BuildButton({ onLog, projectName, userId }: BuildButtonProps) {
   const [isBuilding, setIsBuilding] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
 
   const handleBuild = async () => {
     if (!projectName) {
       onLog(" Project name is required to build", "error");
+      setAnnouncement("Build failed. A project name is required.");
       return;
     }
     if (!userId) {
       onLog(" Wallet connection required to build", "error");
+      setAnnouncement("Build failed. A wallet connection is required.");
       return;
     }
 
     setIsBuilding(true);
+    setAnnouncement(`Building contract ${projectName}.`);
     onLog("", "log"); // Empty line for spacing
     onLog("", "info");
     onLog(" BUILDING CONTRACT", "info");
@@ -115,11 +120,17 @@ export function BuildButton({ onLog, projectName, userId }: BuildButtonProps) {
         onLog("", "log");
         onLog(` WASM Size: ${(data.wasmSize / 1024).toFixed(2)} KB`, "log");
         onLog("", "log");
+        setAnnouncement(
+          `Build succeeded. WASM size ${(data.wasmSize / 1024).toFixed(
+            2
+          )} kilobytes.`
+        );
       } else {
         onLog("", "log");
         onLog("", "error");
         onLog(" BUILD FAILED", "error");
         onLog("", "error");
+        setAnnouncement("Build failed. See the console for the compiler output.");
         onLog("", "log");
 
         // Format and display stderr (compiler errors)
@@ -148,6 +159,9 @@ export function BuildButton({ onLog, projectName, userId }: BuildButtonProps) {
       onLog("", "error");
       onLog(`${errorMessage}`, "error");
       onLog("", "log");
+      setAnnouncement(
+        sanitizeAnnouncement(`Build failed: ${errorMessage}`)
+      );
       console.error("Build error:", error);
     } finally {
       setIsBuilding(false);
@@ -155,14 +169,28 @@ export function BuildButton({ onLog, projectName, userId }: BuildButtonProps) {
   };
 
   return (
-    <button
-      onClick={handleBuild}
-      disabled={isBuilding}
-      className="text-xs px-3 py-1 rounded dark:bg-black hover:bg-[#2a2a2a] disabled:bg-gray-600 text-white disabled:opacity-50 transition-colors flex items-center gap-2"
-      title="Build contract (compile WASM)"
-    >
-      <Zap size={14} />
-      {isBuilding ? "Building..." : "Build"}
-    </button>
+    <>
+      <span
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </span>
+      <button
+        onClick={handleBuild}
+        disabled={isBuilding}
+        aria-busy={isBuilding}
+        aria-label={
+          isBuilding ? "Building contract, please wait" : "Build contract"
+        }
+        className="text-xs px-3 py-1 rounded dark:bg-black hover:bg-[#2a2a2a] disabled:bg-gray-600 text-white disabled:opacity-50 transition-colors flex items-center gap-2"
+        title="Build contract (compile WASM)"
+      >
+        <Zap size={14} />
+        {isBuilding ? "Building..." : "Build"}
+      </button>
+    </>
   );
 }
