@@ -76,7 +76,7 @@ This version reads **no environment variables**: there is no `process.env` acces
 
 ## Docker Image
 
-The editor compiles Soroban contracts inside an isolated Docker container. The image is **not** published — every contributor builds it locally from the repository root `Dockerfile`. The runtime (`lib/docker/containerOps.ts`) hardcodes the tag **`stellar-sandbox:v1`**; if you change the Dockerfile or want to use a different tag, you must update both the build command and `lib/docker/containerOps.ts` together, or the editor will fail to spawn containers.
+The editor compiles Soroban contracts inside an isolated Docker container. The image is **not** published — every contributor builds it locally from the repository root `Dockerfile`. The version of the image the app expects is defined once in `lib/docker/image.ts` (`SANDBOX_IMAGE`, currently **`stellar-sandbox:1.0.0`**) and is also tagged with the floating alias `stellar-sandbox:v1` for convenience. If you change the Dockerfile or want to use a different tag, update the build command and `lib/docker/image.ts` together, or the editor will fail to spawn containers.
 
 ### Pinned toolchain
 
@@ -84,11 +84,11 @@ The `Dockerfile` pins the following versions (verified against the build on 2026
 
 | Tool | Version | Source |
 | --- | --- | --- |
-| Ubuntu | `22.04` | `FROM ubuntu:22.04` |
-| Rust | `stable` (latest as of build) via `rustup` minimal profile | `https://sh.rustup.rs` |
-| `wasm32v1-none` target | added to the stable toolchain | `rustup target add wasm32v1-none` |
-| `rust-analyzer` | latest component on the stable toolchain | `rustup component add rust-analyzer` |
-| Stellar CLI | **`v23.3.0`** | `https://github.com/stellar/stellar-cli/releases/download/v23.3.0/stellar-cli-23.3.0-<arch>-unknown-linux-gnu.tar.gz` |
+| Ubuntu | `22.04`, pinned by manifest digest `sha256:5ec03bb3441e…` | `FROM ubuntu:22.04@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401` |
+| Rust | **`1.99.0`** (pinned via `ARG RUST_VERSION`) | `rustup` minimal profile |
+| `wasm32v1-none` target | added to the pinned `1.99.0` toolchain | `rustup target add wasm32v1-none` |
+| `rust-analyzer` | pinned component of toolchain `1.99.0` | `rustup component add rust-analyzer` |
+| Stellar CLI | **`v23.3.0`** (pinned via `ARG STELLAR_CLI_VERSION`) | `https://github.com/stellar/stellar-cli/releases/download/v23.3.0/stellar-cli-23.3.0-<arch>-unknown-linux-gnu.tar.gz` |
 
 ### Multi-architecture support
 
@@ -101,16 +101,16 @@ To build for a different architecture on a single host, use Docker's `--platform
 
 ```bash
 # Build for arm64 on an amd64 host (uses QEMU emulation)
-docker build --platform linux/arm64 -t stellar-sandbox:v1 .
+docker build --platform linux/arm64 -t stellar-sandbox:1.0.0 -t stellar-sandbox:v1 .
 
 # Build for amd64 (the default on x86_64 hosts)
-docker build -t stellar-sandbox:v1 .
+docker build -t stellar-sandbox:1.0.0 -t stellar-sandbox:v1 .
 ```
 
 ### Build command
 
 ```bash
-docker build -t stellar-sandbox:v1 .
+docker build -t stellar-sandbox:1.0.0 -t stellar-sandbox:v1 .
 ```
 
 The build runs as the `developer` user (UID 1000) created inside the image — it does not run as root. The final `WORKDIR` is `/home/developer/workspace`, and the default `CMD` is `/bin/bash`.
@@ -123,17 +123,17 @@ The Dockerfile ends with a verification step:
 RUN rustc --version && stellar --version && rust-analyzer --version
 ```
 
-If any of these fail, the build fails. The image will be tagged `stellar-sandbox:v1` and the runtime in `lib/docker/containerOps.ts` will find it via that tag.
+If any of these fail, the build fails. The image is tagged `stellar-sandbox:1.0.0` (immutable — the tag `lib/docker/image.ts` launches containers from) and `stellar-sandbox:v1` (floating alias). The resolved toolchain is also written to `/home/developer/.stellar-sandbox-versions` inside the image and surfaced by the app's health action.
 
 ### When to rebuild
 
-Rebuild the image (`docker build -t stellar-sandbox:v1 .`) whenever:
+Rebuild the image (`docker build -t stellar-sandbox:1.0.0 -t stellar-sandbox:v1 .`) whenever:
 
 1. **The Dockerfile changes** — any change to the pinned versions, the `apt-get install` list, the `rustup` invocations, or the `stellar-cli` release URL requires a rebuild.
 2. **A Rust target is added or removed** — `rustup target add` is baked into the image; the host `rustup` is not used at runtime.
 3. **A `stellar-cli` upgrade is desired** — bump the version in the `curl` URL AND the matching release asset name, then rebuild.
 
-If you change the tag (`stellar-sandbox:v1` → something else), update `lib/docker/containerOps.ts` in the same commit — the runtime looks up the container by that exact string.
+All toolchain pins live in the `ARG` block at the top of the `Dockerfile`, so moving to a new release is a deliberate edit to that one file; the image tag the app launches lives in `lib/docker/image.ts`. Rebuild and retag the image (see the build commands above) after either change. The `Docker image` CI workflow rebuilds the image from the same commit and prints `rustc`, `stellar` and `rust-analyzer` versions.
 
 ## Getting Started
 

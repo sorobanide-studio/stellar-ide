@@ -11,6 +11,13 @@
  * - utils.ts: Utility functions
  */
 
+// Export image constants (single source of truth: lib/docker/image.ts)
+export {
+  SANDBOX_IMAGE,
+  SANDBOX_IMAGE_VERSION,
+  SANDBOX_IMAGE_FLOATING,
+} from './image';
+
 // Export utilities
 export {
   execAsync,
@@ -33,6 +40,7 @@ export {
   deleteContainer,
   checkContainerHealth,
   ensureContainerRunning,
+  getToolchainVersions,
 } from './containerOps';
 
 // Export file operations

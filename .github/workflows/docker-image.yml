@@ -1,0 +1,31 @@
+name: Docker image
+
+# Rebuilds the pinned sandbox image and prints the resolved toolchain versions.
+# A rebuild from the same commit must yield the same versions.
+on:
+  push:
+    paths:
+      - Dockerfile
+      - .github/workflows/docker-image.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .github/workflows/docker-image.yml
+  workflow_dispatch:
+
+jobs:
+  build-and-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build sandbox image
+        run: docker build -t stellar-sandbox:ci .
+
+      - name: Print rustc, stellar and rust-analyzer versions
+        run: |
+          docker run --rm stellar-sandbox:ci sh -c 'rustc --version && stellar --version && rust-analyzer --version'
+
+      - name: Show the version manifest baked into the image
+        run: docker run --rm stellar-sandbox:ci cat /home/developer/.stellar-sandbox-versions

@@ -11,6 +11,7 @@ import {
   getWorkspaceVolumeName,
   sleep,
 } from './utils';
+import { SANDBOX_IMAGE } from './image';
 
 /**
  * Build the `docker run` command that creates a wallet's container.
@@ -90,6 +91,7 @@ export async function createAndInitializeContainer(walletAddress: string) {
       const { stdout: createOutput } = await execAsync(
         buildRunContainerCommand(walletAddress)
         `docker run -d --name ${containerName} -e STELLAR_HOME=/home/developer/.stellar stellar-sandbox:v1 tail -f /dev/null`
+        `docker run -d --name ${containerName} -e STELLAR_HOME=/home/developer/workspace/.stellar ${SANDBOX_IMAGE} tail -f /dev/null`
       );
       console.log('Container created:', createOutput.trim());
 
@@ -261,5 +263,34 @@ export async function ensureContainerRunning(walletAddress: string): Promise<voi
   if (!isRunning) {
     throw new Error(`Container for wallet ${walletAddress} is not running`);
   }
+}
+
+/**
+ * Read the toolchain versions baked into the sandbox image.
+ *
+ * The Dockerfile records `image`, `rust` and `stellar-cli` in
+ * `/home/developer/.stellar-sandbox-versions` at build time; this surfaces them
+ * so a health check can report the running toolchain.
+ * @param walletAddress The Stellar wallet public key
+ * @returns Parsed key/value version manifest
+ */
+export async function getToolchainVersions(
+  walletAddress: string
+): Promise<Record<string, string>> {
+  const containerName = getContainerName(walletAddress);
+  const { stdout } = await execAsync(
+    `docker exec ${containerName} cat /home/developer/.stellar-sandbox-versions 2>/dev/null || true`
+  );
+
+  const versions: Record<string, string> = {};
+  for (const line of stdout.trim().split('\n')) {
+    if (!line) continue;
+    const separator = line.indexOf('=');
+    if (separator === -1) continue;
+    const key = line.slice(0, separator).trim();
+    const value = line.slice(separator + 1).trim();
+    if (key) versions[key] = value;
+  }
+  return versions;
 }
 
