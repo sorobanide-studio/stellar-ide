@@ -196,6 +196,11 @@ export default function BottomPanel({
   );
 }
 
+// Only the newest entries are mounted. The retained history can be much
+// larger, so windowing keeps the DOM node count bounded independently of
+// MAX_TERMINAL_LOG_ENTRIES.
+const TERMINAL_LOG_RENDER_LIMIT = 500;
+
 // Terminal Content Component (extracted from Terminal.tsx)
 function TerminalContent({
   logs,
@@ -204,6 +209,11 @@ function TerminalContent({
   logs: LogMessage[];
   terminalRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const visibleLogs =
+    logs.length > TERMINAL_LOG_RENDER_LIMIT
+      ? logs.slice(logs.length - TERMINAL_LOG_RENDER_LIMIT)
+      : logs;
+
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
     if (terminalRef.current) {
@@ -251,12 +261,12 @@ function TerminalContent({
       ref={terminalRef}
       className="h-full overflow-y-auto bg-[#171717] font-mono text-sm p-4 space-y-1 sidebar-scrollbar"
     >
-      {logs.length === 0 ? (
+      {visibleLogs.length === 0 ? (
         <div className="text-gray-500 text-sm">
           Waiting for console output...
         </div>
       ) : (
-        logs.map((log) => (
+        visibleLogs.map((log) => (
           <div key={log.id} className="flex gap-3 leading-5">
             <span className="text-gray-600 text-xs whitespace-nowrap select-none w-20 shrink-0">
               {log.timestamp}
