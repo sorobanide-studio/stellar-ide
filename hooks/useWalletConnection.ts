@@ -11,23 +11,35 @@ export function useWalletConnection() {
   const walletContext = useWallet();
 
   const fetchBalance = async (publicKey: string): Promise<string> => {
+    let response: Response;
     try {
-      const response = await fetch(
+      response = await fetch(
         `https://horizon-testnet.stellar.org/accounts/${publicKey}`
       );
-      if (!response.ok) {
-        return "0.00";
-      }
-      const data = await response.json();
-      const nativeBalance = data.balances.find(
-        (b: { asset_type: string; balance: string }) =>
-          b.asset_type === "native"
-      );
-      return nativeBalance ? nativeBalance.balance : "0.00";
-    } catch (error) {
-      console.error("Error fetching balance:", error);
+    } catch (networkError) {
+      // A transport failure is NOT a zero balance - surface it explicitly.
+      console.error("Error fetching balance:", networkError);
+      throw new Error("Failed to reach Horizon while fetching balance");
+    }
+
+    if (response.status === 404) {
+      // The account simply is not funded yet; a zero balance is correct here.
       return "0.00";
     }
+
+    if (!response.ok) {
+      // 429/5xx etc. must not be silently reported as a zero balance.
+      throw new Error(
+        `Horizon balance request failed with status ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+    const nativeBalance = data.balances.find(
+      (b: { asset_type: string; balance: string }) =>
+        b.asset_type === "native"
+    );
+    return nativeBalance ? nativeBalance.balance : "0.00";
   };
 
   const createContainer = async (walletAddress: string): Promise<void> => {
@@ -39,6 +51,43 @@ export function useWalletConnection() {
         setError(message);
       },
     });
+    try {
+      const containerResponse = await fetch("/api/docker", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          walletAddress,
+        }),
+      });
+
+      if (!containerResponse.ok) {
+        throw new Error(
+          `Container API error: ${containerResponse.status} ${containerResponse.statusText}`
+        );
+      }
+
+      const containerData = await containerResponse.json();
+      if (containerData.success) {
+        console.log(`Container created: ${containerData.containerName}`);
+        walletContext.setContainerReady(true);
+      } else {
+        // Do NOT mark the wallet ready when the container was never created.
+        console.warn(`Container creation warning: ${containerData.error}`);
+        setError(
+          `Container creation failed: ${containerData.error || "unknown error"}`
+        );
+      }
+    } catch (containerError) {
+      const message =
+        containerError instanceof Error
+          ? containerError.message
+          : String(containerError);
+      console.warn("Container creation error:", containerError);
+      // Leave containerReady untouched (false) so the editor does not treat
+      // a missing container as ready.
+      setError(message);
+    }
   };
 
   const handleConnect = async (): Promise<void> => {
