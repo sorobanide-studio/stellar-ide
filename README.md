@@ -512,7 +512,7 @@ The following rows appeared in the previous table but are NOT registered in
 
 The application uses Docker containers to provide isolated development environments:
 
-- **One container per project** - Each project runs in its own Docker container
+- **One container per wallet** - Each connected wallet gets a single Docker container, and every project in that wallet lives inside it
 - **Soroban template initialized** - Every new project comes with a working contract template
 - **File persistence** - Project files live in a per-wallet named Docker volume mounted at `/home/developer/workspace`, so they survive container removal and image rebuilds
 
@@ -528,9 +528,15 @@ Deleting a container retains the workspace volume by default. The API surfaces t
 
 When you create a new project:
 
-1. A Docker container is created with a unique name (`project-{id}`)
+1. A Docker container is created for your connected wallet, named `soroban-<wallet-prefix>` - `soroban-` followed by the first ten characters of the wallet address, lowercased (`getContainerName` in `lib/docker/utils.ts`). The name is derived from the connected wallet, not from the project, so every project in one wallet shares the same container.
 2. The Soroban contract template is automatically initialized
 3. Dependencies are installed (`cargo build`)
+
+Find the container for the connected wallet with:
+
+```bash
+docker ps --filter name=^soroban-
+```
 
 #### Container Operations via API
 
@@ -978,9 +984,10 @@ If you encounter issues not listed above:
 
 1. **Check the Terminal panel** for detailed error messages
 2. **Review the console** (F12 → Console tab) for JavaScript errors
-3. **Check Docker logs** for container-related issues:
+3. **Check Docker logs** for container-related issues (the container is named after the connected wallet):
    ```bash
-   docker logs <container-name>
+   docker ps --filter name=^soroban-
+   docker logs <soroban-wallet-prefix>
    ```
 4. **Restart the application**:
    - Stop the dev server (Ctrl + C)
