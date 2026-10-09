@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { setAllowed, getAddress } from "@stellar/freighter-api";
 import { useWallet } from "@/context/WalletContext";
+import { createContainerForWallet } from "@/lib/docker/containerState";
 
 export function useWalletConnection() {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -30,34 +31,14 @@ export function useWalletConnection() {
   };
 
   const createContainer = async (walletAddress: string): Promise<void> => {
-    try {
-      const containerResponse = await fetch("/api/docker", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create",
-          walletAddress,
-        }),
-      });
-
-      if (!containerResponse.ok) {
-        throw new Error(
-          `Container API error: ${containerResponse.status} ${containerResponse.statusText}`
-        );
-      }
-
-      const containerData = await containerResponse.json();
-      if (containerData.success) {
-        console.log(`Container created: ${containerData.containerName}`);
-        walletContext.setContainerReady(true);
-      } else {
-        console.warn(`Container creation warning: ${containerData.error}`);
-        walletContext.setContainerReady(true);
-      }
-    } catch (containerError) {
-      console.warn("Container creation error:", containerError);
-      walletContext.setContainerReady(true);
-    }
+    await createContainerForWallet(walletAddress, {
+      setContainerReady: walletContext.setContainerReady,
+      onInfo: (message) => console.log(message),
+      onError: (message) => {
+        console.warn(message);
+        setError(message);
+      },
+    });
   };
 
   const handleConnect = async (): Promise<void> => {
