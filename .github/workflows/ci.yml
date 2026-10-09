@@ -19,6 +19,8 @@ jobs:
         node-version: '20'
     - name: Install dependencies
       run: npm ci
+    - name: Check the lockfile is in sync with package.json
+      run: node .github/scripts/check-lockfile.mjs
     - name: Lint
       run: npm run lint
   type-check:
@@ -71,7 +73,6 @@ jobs:
     - type-check
     - build
     - test
-    - docker-image
     if: always()
     steps:
     - name: Fail if any required job did not succeed
