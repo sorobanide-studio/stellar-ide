@@ -835,10 +835,38 @@ If you encounter issues not listed above:
 
 ## Security
 
-- **Private containers** - Each project runs in an isolated Docker container
-- **Wallet security** - Private keys never leave your Freighter wallet
-- **HTTPS only** - All connections use secure HTTPS
-- **No data collection** - Your code and wallet information remain private
+This is a local development tool. This section describes what the code actually does, including the
+gaps to be aware of before running it on shared or untrusted infrastructure.
+
+### What is true
+
+- **No private keys are handled** - `lib/wallet-deploy.ts` never receives or stores a secret key. It
+  calls `signTransaction` / `setAllowed` / `getAddress` from `@stellar/freighter-api`, so signing
+  happens inside the Freighter extension.
+- **No analytics or telemetry** - there is no analytics, telemetry or tracking call in the
+  repository. The app talks to the local `/api/docker` route, the hardcoded Soroban testnet RPC
+  endpoint in `lib/wallet-deploy.ts`, and `horizon-testnet.stellar.org` for the wallet balance.
+
+### Known limitations
+
+- **Container isolation is by name only** - `lib/docker/containerOps.ts` starts each container with a
+  single `docker run -d`. Containers share the host Docker daemon and are created with no CPU, memory
+  or network limits and no separate Docker network.
+- **The LSP socket is plaintext** - the editor connects to the language server over
+  `ws://localhost:3001` (`lib/lsp/hooks/useLSPConnection.ts`). It is not TLS, so it must not be
+  exposed beyond localhost.
+- **`/api/docker` is unauthenticated** - `app/api/docker/route.ts` accepts any request that supplies a
+  `walletAddress`. There is no session, token or ownership check, so anyone who can reach the route
+  and knows a wallet address can list, read, create, overwrite, build and delete files in that
+  wallet's container.
+- **Credentials are copied into the project directory** - `createAccount` in
+  `lib/docker/accountOps.ts` copies `/home/developer/.config` (Stellar CLI identities) into the
+  project folder inside the container.
+- **HTTPS is only the dev server** - `npm run dev` serves the UI over experimental HTTPS, but the LSP
+  connection is plain `ws://` and the API route has no authentication.
+
+Treat the editor as a single-user local tool: run it on a machine you control, keep port 3001 and the
+Docker socket off the network, and do not expose the dev server to others.
 
 ## License
 
