@@ -93,10 +93,12 @@ export async function buildContract(userId: string, projectName?: string) {
     }
 
     // Read the WASM file as base64
-    const { stdout: wasmBase64 } = await execAsync(
+    const { stdout: wasmBase64Stdout } = await execAsync(
       `docker exec ${containerName} cat ${wasmPath} | base64`,
       { maxBuffer: 20 * 1024 * 1024 }
     );
+
+    const wasmBase64 = wasmBase64Stdout.trim();
 
     return {
       success: true,
@@ -104,6 +106,9 @@ export async function buildContract(userId: string, projectName?: string) {
       // wasmSize is the decoded byte length of the artifact (not the base64
       // string length); callers convert it to KB for display.
       wasmSize: decodeWasmSize(wasmBase64),
+      wasmBase64,
+      // Report the decoded binary length, not the ~33% longer base64 text.
+      wasmSize: Buffer.from(wasmBase64, 'base64').length,
       buildOutput: 'Build completed successfully',
     };
   } catch (error: any) {
