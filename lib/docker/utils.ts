@@ -128,6 +128,18 @@ export function getContainerName(walletAddress: string): string {
  */
 export function getWorkspaceVolumeName(walletAddress: string): string {
   return `${getContainerName(walletAddress)}-workspace`;
+ * Get the Stellar CLI identity name for a wallet.
+ *
+ * Derived from the wallet address using the same 10-character prefix as
+ * `getContainerName`, so every wallet gets its own funded Stellar key instead
+ * of sharing one hard-coded identity.
+ * Format: stellar-GBUQWP3K... -> stellar-gbuqwp3k
+ * @param walletAddress The Stellar wallet public key
+ * @returns Formatted identity name
+ */
+export function getIdentityName(walletAddress: string): string {
+  const prefix = walletAddress.slice(0, 10).toLowerCase();
+  return `stellar-${prefix}`;
 }
 
 /**
