@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
       with:
         node-version: '20'
     - name: Install dependencies
@@ -27,9 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
       with:
         node-version: '20'
     - name: Install dependencies
@@ -42,9 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
       with:
         node-version: '20'
     - name: Install dependencies
@@ -58,9 +58,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
       with:
         node-version: '20'
     - name: Install dependencies
@@ -247,5 +247,17 @@ jobs:
       run: "docker run --rm \\\n  -v \"${{ github.workspace }}:/repo\" \\\n  -w /repo\
         \ \\\n  ghcr.io/gitleaks/gitleaks:v8.30.1 \\\n  detect --source=/repo --config=/repo/.gitleaks.toml\
         \ --redact --verbose --exit-code=1\n"
+  pins:
+    name: pins
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - name: Fail if any action is not pinned to a full commit SHA
+      run: "if grep -REn '^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*[^[:space:]]+@[^[:space:]]+'\
+        \ .github/workflows \\\n    | grep -vE '@[0-9a-f]{40}([[:space:]]|$)'; then\n\
+        \  echo \"::error::Every 'uses:' reference must be pinned to a 40-character\
+        \ commit SHA.\"\n  exit 1\nfi\necho \"All 'uses:' references are pinned to\
+        \ a full commit SHA.\"\n"
 permissions:
   contents: read
