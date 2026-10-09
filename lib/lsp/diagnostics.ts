@@ -24,6 +24,28 @@ const LSP_SEVERITY_TO_MONACO: Record<number, number> = {
 };
 
 const DEFAULT_MONACO_SEVERITY = 8;
+ * URIs the client has closed via `textDocument/didClose`.
+ *
+ * Diagnostics that arrive for a closed document are stale: applying them paints
+ * markers for a file the user is no longer editing onto whichever model
+ * happens to match. They are dropped until the document is re-opened.
+ */
+const closedUris = new Set<string>();
+
+/** Mark a document as (re)opened so its diagnostics are applied again. */
+export function markUriOpen(uri: string): void {
+  closedUris.delete(uri);
+}
+
+/** Mark a document as closed so any late diagnostics for it are dropped. */
+export function markUriClosed(uri: string): void {
+  closedUris.add(uri);
+}
+
+/** @returns true when the client has closed (and not re-opened) the document. */
+export function isUriClosed(uri: string): boolean {
+  return closedUris.has(uri);
+}
 
 /**
  * Convert LSP diagnostics to Monaco markers
@@ -109,6 +131,11 @@ export function applyMarkersToEditor(
   maxRetries = 3
 ): void {
   const applyWithRetry = (attempt: number) => {
+    if (isUriClosed(uri)) {
+      console.log(`[LSP Diagnostics] Dropping ${markers.length} markers for closed document: ${uri}`);
+      return;
+    }
+
     const windowWithMonaco = window as WindowWithMonaco;
 
     if (!windowWithMonaco.monacoInstance) {

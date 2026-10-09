@@ -1,6 +1,7 @@
 /**
  * LSP Notifications
- * Document synchronization notifications (didOpen, didChange, initialized)
+ * Document synchronization notifications
+ * (didOpen, didChange, didClose, initialized)
  */
 
 /**
@@ -44,6 +45,21 @@ export function sendDidChange(
         version,
       },
       contentChanges: [{ text }],
+    },
+  }));
+}
+
+/**
+ * Send a textDocument/didClose notification
+ */
+export function sendDidClose(ws: WebSocket, uri: string): void {
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/didClose',
+    params: {
+      textDocument: {
+        uri,
+      },
     },
   }));
 }
