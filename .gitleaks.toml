@@ -1,0 +1,16 @@
+# Secret-scanning configuration for stellar-ide.
+#
+# `useDefault` keeps the gitleaks built-in rules (AWS keys, GitHub tokens,
+# private keys, ...) and the rule below adds the pattern that matters most for
+# this project: a Stellar secret key, which is an ed25519 seed rendered as the
+# letter S followed by 55 base32 characters (A-Z and 2-7).
+title = "stellar-ide secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "stellar-secret-key"
+description = "Stellar secret key (S followed by 55 base32 characters)"
+regex = '''\bS[A-Z2-7]{55}\b'''
+tags = ["key", "stellar", "secret"]

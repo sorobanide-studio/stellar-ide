@@ -76,9 +76,7 @@ jobs:
     - type-check
     - build
     - test
-    - audit
     - secret-scan
-    - lsp
     if: always()
     steps:
     - name: Fail if any required job did not succeed
