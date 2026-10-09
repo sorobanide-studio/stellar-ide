@@ -56,12 +56,19 @@ export async function saveFileContent(walletAddress: string, filePath: string, c
         success: false,
         error: `File not found at ${fullPath}. Try refreshing the file tree.`,
       };
+    // Ensure the parent directory exists so a save to a path that does not
+    // exist yet creates the file (upsert) instead of failing a `test -f` guard.
+    const parentDir = fullPath.substring(0, fullPath.lastIndexOf('/'));
+    if (parentDir) {
+      await execAsync(`docker exec -u developer ${containerName} mkdir -p ${parentDir}`);
     }
 
     // Escape content for shell - use base64 encoding to avoid shell escaping issues
     const base64Content = Buffer.from(content).toString('base64');
 
     // Write file as the unprivileged `developer` user so the build user owns it
+    // Write file to container using base64 decoding. `>` creates the file when
+    // it is missing and truncates it when it exists.
     await execAsync(
       buildWriteFileCommand(containerName, fullPath, base64Content),
       { timeout: 10000 }
