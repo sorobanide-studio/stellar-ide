@@ -8,7 +8,7 @@
     "dev": "ts-node src/server.ts"
   },
   "dependencies": {
-    "dockerode": "^4.0.9",
+    "dockerode": "^5.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.1",
     "ws": "^8.18.0"
