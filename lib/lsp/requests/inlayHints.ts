@@ -5,6 +5,7 @@
 
 import { InlayHint } from '../types';
 import { awaitResponse, createRequestId } from './utils';
+import { awaitResponse, createRequestId, type CancellationTokenLike } from './utils';
 
 /**
  * Request inlay hints from LSP
@@ -13,6 +14,7 @@ export function requestInlayHints(
   ws: WebSocket,
   uri: string,
   range: { startLine: number; endLine: number },
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<InlayHint[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -22,6 +24,13 @@ export function requestInlayHints(
   const requestId = createRequestId();
   const response = awaitResponse<InlayHint[]>(ws, requestId, timeout, [], (result) =>
     (result as InlayHint[]) || []
+  const response = awaitResponse<InlayHint[]>(
+    ws,
+    requestId,
+    timeout,
+    [],
+    (result) => (result as InlayHint[]) || [],
+    token
   );
 
   ws.send(JSON.stringify({

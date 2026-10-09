@@ -11,7 +11,8 @@ import type { MonacoType } from "./types";
  */
 async function requestPrepareRenameInfo(
   uri: string,
-  position: { line: number; character: number }
+  position: { line: number; character: number },
+  token?: CancellationToken
 ): Promise<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string } | null> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestPrepareRename) {
@@ -19,7 +20,7 @@ async function requestPrepareRenameInfo(
   }
 
   try {
-    const result = await lspFn.requestPrepareRename(uri, position);
+    const result = await lspFn.requestPrepareRename(uri, position, token);
     return result;
   } catch (error) {
     console.error("[Rename] Prepare error:", error);
@@ -44,7 +45,8 @@ interface RenameResult {
 async function requestRenameInfo(
   uri: string,
   position: { line: number; character: number },
-  newName: string
+  newName: string,
+  token?: CancellationToken
 ): Promise<RenameResult | null> {
   const lspFn = window.lspFunctions;
   if (!lspFn?.requestRename) {
@@ -52,7 +54,7 @@ async function requestRenameInfo(
   }
 
   try {
-    const result = await lspFn.requestRename(uri, position, newName);
+    const result = await lspFn.requestRename(uri, position, newName, token);
     return result as RenameResult | null;
   } catch (error) {
     console.error("[Rename] Error:", error);
@@ -120,7 +122,7 @@ export function registerRenameProvider(
       model: editor.ITextModel,
       position: Position,
       newName: string,
-      _token: CancellationToken
+      token: CancellationToken
     ): Promise<languages.WorkspaceEdit | null> => {
       const uri = model.uri.toString();
 
@@ -131,7 +133,7 @@ export function registerRenameProvider(
       };
 
       // First, check if rename is possible (prepareRename)
-      const prepareResult = await requestPrepareRenameInfo(uri, lspPosition);
+      const prepareResult = await requestPrepareRenameInfo(uri, lspPosition, token);
       
       if (!prepareResult) {
         console.log("[Rename] Rename not possible at this location");
@@ -141,7 +143,7 @@ export function registerRenameProvider(
       console.log(`[Rename] Preparing to rename to: ${newName}`);
 
       // Perform the actual rename
-      const renameResult = await requestRenameInfo(uri, lspPosition, newName);
+      const renameResult = await requestRenameInfo(uri, lspPosition, newName, token);
 
       if (!renameResult || !renameResult.changes) {
         console.log("[Rename] No changes returned from LSP");

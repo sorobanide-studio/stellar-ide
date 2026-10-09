@@ -4,6 +4,16 @@
  */
 
 /**
+ * Minimal structural type for Monaco's `CancellationToken`. Kept local so the
+ * request layer does not depend on `monaco-editor`; a real Monaco token is
+ * structurally compatible.
+ */
+export interface CancellationTokenLike {
+  readonly isCancellationRequested: boolean;
+  onCancellationRequested(listener: () => void): { dispose(): void };
+}
+
+/**
  * Minimal JSON-RPC response shape handled here.
  */
 interface LspResponse {
@@ -30,6 +40,14 @@ export function createRequestId(): number {
  * manages that lifecycle, so it can clear the timer on every resolution path —
  * result, JSON-RPC error, and timeout — and can never resolve twice. Because
  * all request modules use it, a new request cannot reintroduce the leak.
+ * Resolve a single JSON-RPC response for `requestId`, owning the listener and
+ * timeout lifecycle and honouring an optional cancellation token.
+ *
+ * When a `token` is supplied and Monaco cancels the request (for example the
+ * next keystroke cancels an in-flight completion), the listener is removed, the
+ * timer cleared and a `$/cancelRequest` notification naming `requestId` is sent
+ * to rust-analyzer before the promise resolves with `defaultValue`. A late
+ * result therefore can never resolve the promise and overwrite a newer one.
  */
 export function awaitResponse<T>(
   ws: WebSocket,
@@ -37,6 +55,8 @@ export function awaitResponse<T>(
   timeout: number,
   defaultValue: T,
   select: (result: unknown) => T
+  select: (result: unknown) => T,
+  token?: CancellationTokenLike
 ): Promise<T> {
   return new Promise<T>((resolve) => {
     let settled = false;
@@ -47,11 +67,26 @@ export function awaitResponse<T>(
         return;
       }
       settled = true;
+    let cancellationSub: { dispose(): void } | undefined;
+
+    function cleanup() {
       ws.removeEventListener('message', handleMessage);
       if (timer !== undefined) {
         clearTimeout(timer);
         timer = undefined;
       }
+      if (cancellationSub) {
+        cancellationSub.dispose();
+        cancellationSub = undefined;
+      }
+    }
+
+    function finish(value: T) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
       resolve(value);
     }
 
@@ -84,6 +119,29 @@ export function awaitResponse<T>(
     ws.addEventListener('message', handleMessage);
 
     timer = setTimeout(() => finish(defaultValue), timeout);
+    timer = setTimeout(() => finish(defaultValue), timeout);
+
+    if (token) {
+      if (token.isCancellationRequested) {
+        finish(defaultValue);
+        return;
+      }
+
+      cancellationSub = token.onCancellationRequested(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify({
+              jsonrpc: '2.0',
+              method: '$/cancelRequest',
+              params: { id: requestId },
+            }));
+          } catch {
+            // Best-effort: the socket may already be closing.
+          }
+        }
+        finish(defaultValue);
+      });
+    }
   });
 }
 

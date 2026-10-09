@@ -4,6 +4,7 @@
  */
 
 import { awaitResponse, createRequestId, TextEdit } from './utils';
+import { awaitResponse, createRequestId, type CancellationTokenLike, TextEdit } from './utils';
 
 /**
  * Request prepare rename (check if rename is possible)
@@ -12,6 +13,7 @@ export function requestPrepareRename(
   ws: WebSocket,
   uri: string,
   position: { line: number; character: number },
+  token?: CancellationTokenLike,
   timeout = 3000
 ): Promise<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string } | null> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -26,6 +28,8 @@ export function requestPrepareRename(
     null,
     // Result can be { range, placeholder } or just { range }
     (result) => (result as { range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string }) || null
+    (result) => (result as { range: { start: { line: number; character: number }; end: { line: number; character: number } }; placeholder?: string }) || null,
+    token
   );
 
   ws.send(JSON.stringify({
@@ -49,6 +53,7 @@ export function requestRename(
   uri: string,
   position: { line: number; character: number },
   newName: string,
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<{ changes?: Record<string, TextEdit[]> } | null> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -62,6 +67,8 @@ export function requestRename(
     timeout,
     null,
     (result) => (result as { changes?: Record<string, TextEdit[]> }) || null
+    (result) => (result as { changes?: Record<string, TextEdit[]> }) || null,
+    token
   );
 
   ws.send(JSON.stringify({
@@ -86,6 +93,7 @@ export function requestCodeAction(
   uri: string,
   range: { start: { line: number; character: number }; end: { line: number; character: number } },
   context: { diagnostics: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; severity: number; code?: string | number }> },
+  token?: CancellationTokenLike,
   timeout = 5000
 ): Promise<CodeAction[]> {
   if (ws.readyState !== WebSocket.OPEN) {
@@ -107,6 +115,7 @@ export function requestCodeAction(
     }
     return [];
   });
+  }, token);
 
   ws.send(JSON.stringify({
     jsonrpc: '2.0',
