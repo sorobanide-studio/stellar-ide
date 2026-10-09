@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0 app components context hooks lib tests",
     "test": "vitest run",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit --pretty false"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
