@@ -8,8 +8,14 @@ import {
   getContainerName,
   getWorkspacePath,
   escapeFilePath,
-  escapeShellArg,
 } from '../utils';
+import {
+  buildFindByNameCommand,
+  buildMkdirCommand,
+  buildTestFileCommand,
+  buildTouchFileCommand,
+  buildWriteFileCommand,
+} from './commands';
 
 /**
  * Save content to a file
@@ -34,16 +40,16 @@ export async function saveFileContent(walletAddress: string, filePath: string, c
     const fullPath = `${basePath}/${safePath}`;
     console.log(`Full path: ${fullPath}`);
 
-    // First verify the file exists
+    // First verify the file exists (as `developer`)
     const { stdout: fileCheck } = await execAsync(
-      `docker exec ${containerName} test -f ${fullPath} && echo "exists" || echo "missing"`
+      buildTestFileCommand(containerName, fullPath)
     );
 
     if (fileCheck.trim() === 'missing') {
       console.error(`File not found at: ${fullPath}`);
       // Try to show what files exist
       const { stdout: dirContents } = await execAsync(
-        `docker exec ${containerName} find ${basePath} -name "lib.rs" 2>/dev/null || true`
+        buildFindByNameCommand(containerName, basePath, 'lib.rs')
       );
       console.log('Found lib.rs at:', dirContents);
       return {
@@ -55,11 +61,9 @@ export async function saveFileContent(walletAddress: string, filePath: string, c
     // Escape content for shell - use base64 encoding to avoid shell escaping issues
     const base64Content = Buffer.from(content).toString('base64');
 
-    // Write file to container using base64 decoding
+    // Write file as the unprivileged `developer` user so the build user owns it
     await execAsync(
-      `docker exec -u developer ${containerName} sh -c "echo ${escapeShellArg(
-        base64Content
-      )} | base64 -d > ${fullPath}"`,
+      buildWriteFileCommand(containerName, fullPath, base64Content),
       { timeout: 10000 }
     );
 
@@ -97,20 +101,16 @@ export async function createFile(walletAddress: string, filePath: string, conten
     const basePath = `${workspacePath}/${projectName}`;
     const fullPath = `${basePath}/${safePath}`;
 
-    // Create parent directories if needed
+    // Create parent directories if needed (as `developer`)
     const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
-    await execAsync(`docker exec -u developer ${containerName} mkdir -p ${dir}`);
+    await execAsync(buildMkdirCommand(containerName, dir));
 
-    // Create file with content (or empty if no content)
+    // Create file with content (or empty if no content), as `developer`
     if (content) {
       const base64Content = Buffer.from(content).toString('base64');
-      await execAsync(
-        `docker exec -u developer ${containerName} sh -c "echo ${escapeShellArg(
-          base64Content
-        )} | base64 -d > ${fullPath}"`
-      );
+      await execAsync(buildWriteFileCommand(containerName, fullPath, base64Content));
     } else {
-      await execAsync(`docker exec -u developer ${containerName} touch ${fullPath}`);
+      await execAsync(buildTouchFileCommand(containerName, fullPath));
     }
 
     console.log(`File created: ${fullPath}`);
@@ -149,8 +149,8 @@ export async function createFolder(walletAddress: string, folderPath: string, pr
     const basePath = `${workspacePath}/${projectName}`;
     const fullPath = `${basePath}/${safePath}`;
 
-    // Create folder recursively
-    await execAsync(`docker exec -u developer ${containerName} mkdir -p ${fullPath}`);
+    // Create folder recursively (as `developer`)
+    await execAsync(buildMkdirCommand(containerName, fullPath));
 
     console.log(`Folder created: ${fullPath}`);
     return {

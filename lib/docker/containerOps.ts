@@ -105,6 +105,21 @@ export async function createAndInitializeContainer(walletAddress: string) {
       throw new Error('Container failed to start properly');
     }
 
+    // Correct ownership of files left behind by older versions of the app,
+    // which ran file operations as root. The `developer` build user must own
+    // the workspace, otherwise `cargo build`/`stellar contract build` fails
+    // with permission denied on its own project. This is the one operation
+    // that needs root; every file operation uses `-u developer` (see
+    // `lib/docker/fileOps/commands.ts`).
+    try {
+      await execAsync(
+        `docker exec -u root ${containerName} sh -c "chown -R developer:developer ${getWorkspacePath()} 2>/dev/null || true"`,
+        { timeout: 30000 }
+      );
+    } catch (chownError: any) {
+      console.warn('Warning: could not correct workspace ownership:', chownError?.message || chownError);
+    }
+
     // Initialize Soroban contract in the workspace directory
     console.log(`Initializing contract in container: ${containerName}`);
 
