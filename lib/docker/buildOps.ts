@@ -10,6 +10,8 @@ import {
   getWasmPath,
   getWasmDepsPath,
   resolveProjectDirectory,
+  getWorkspacePath,
+  scriptCommand,
 } from './utils';
 
 /**
@@ -47,7 +49,7 @@ export async function buildContract(userId: string, projectName?: string) {
     console.log('=== STEP 0: Clean previous WASM artifacts (if any) ===');
     try {
       await execAsync(
-        `docker exec ${containerName} sh -c "rm -f ${wasmPath} ${wasmDepsPath} 2>/dev/null || true"`
+        scriptCommand('clean-wasm-artifacts.sh', containerName, wasmPath, wasmDepsPath)
       );
       console.log('Old WASM artifacts (if any) deleted');
     } catch (cleanErr: any) {
@@ -190,7 +192,7 @@ export async function getContractBuildStatus(userId: string, projectName?: strin
     const wasmPath = getWasmPath(projectDir, projectName);
 
     const { stdout: wasmCheck } = await execAsync(
-      `docker exec ${containerName} test -f ${wasmPath} && echo "exists" || echo "missing"`
+      scriptCommand('path-exists.sh', containerName, 'f', wasmPath)
     );
 
     const isBuilt = wasmCheck.trim() === 'exists';
