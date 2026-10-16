@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '20'
     - name: Install dependencies
@@ -27,9 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '20'
     - name: Install dependencies
@@ -42,9 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '20'
     - name: Install dependencies
@@ -58,9 +58,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '20'
     - name: Install dependencies
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
     - name: Build stellar-sandbox:v1
@@ -142,7 +142,7 @@ jobs:
       issues: write
     steps:
     - name: Open or update the single nightly tracking issue
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       env:
         NEEDS: ${{ toJSON(needs) }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{
@@ -172,10 +172,10 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Detect Dockerfile changes
       id: filter
-      uses: dorny/paths-filter@v3
+      uses: dorny/paths-filter@v4
       with:
         filters: "docker:\n  - \"Dockerfile\"\n  - \"lib/docker/**\"\n  - \".github/workflows/ci.yml\"\
           \n"
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Ensure shellcheck is available
       run: "if ! command -v shellcheck >/dev/null 2>&1; then\n  sudo apt-get update\n\
         \  sudo apt-get install -y shellcheck\nfi\nshellcheck --version\n"
@@ -204,9 +204,9 @@ jobs:
         working-directory: stellar-lsp-server
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '20'
     - name: Install dependencies
@@ -220,9 +220,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '20'
     - name: Install root dependencies
@@ -240,7 +240,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout full history
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - name: Scan the full commit history for secrets
@@ -252,7 +252,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
     - name: Fail if any action is not pinned to a full commit SHA
       run: "if grep -REn '^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*[^[:space:]]+@[^[:space:]]+'\
         \ .github/workflows \\\n    | grep -vE '@[0-9a-f]{40}([[:space:]]|$)'; then\n\
