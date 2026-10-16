@@ -12,12 +12,12 @@
     "dockerode": "^5.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.1",
-    "ws": "^8.18.0"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/dockerode": "^3.3.47",
     "@types/node": "^26.6.4",
-    "@types/ws": "^8.5.0",
+    "@types/ws": "^8.18.2",
     "ts-node": "^10.9.0",
     "typescript": "^7.0.2"
   }
